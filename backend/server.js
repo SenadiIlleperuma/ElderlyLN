@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express= require('express');
+const db = require('./db');
 const cors = require('cors');
 const authRouter= require('./routes/auth.route');
 const app= express();
