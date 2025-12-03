@@ -47,7 +47,31 @@ const registerUser = async (role, email, password, phone_no, full_name, district
     }
 };
 
+const loginUser = async (email, password) => {
+    const userResult = await db.query(
+        'SELECT user_id, password_hash, role, email, phone_no FROM "user" WHERE email = $1',
+        [email]
+    );
+    const user = userResult.rows[0];
 
+    if (!user) {
+        throw new Error('Invalid email or password.');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+        throw new Error('Invalid email or password.');
+    }
+
+    const token = jwt.sign(
+        { user_id: user.user_id, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '1d' } 
+    );
+
+    return { token, user_id: user.user_id, role: user.role, email: user.email };
+};
 
 
 module.exports = {
