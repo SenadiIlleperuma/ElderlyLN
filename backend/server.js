@@ -3,6 +3,7 @@ const express= require('express');
 const db = require('./db');
 const cors = require('cors');
 const authRouter= require('./routes/auth.route');
+const matchingRouter = require('./routes/matching.route');
 const app= express();
 const PORT =process.env.PORT || 3000;
 
@@ -11,6 +12,8 @@ app.use(cors());
 
 //routes
 app.use('/app/auth',authRouter)
+app.use('/app/matching',matchingRouter);
+
 //test API
 app.get ('/api/test',async(req, res)=>{
     try{
