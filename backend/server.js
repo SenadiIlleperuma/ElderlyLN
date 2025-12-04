@@ -11,8 +11,8 @@ app.use(express.json());
 app.use(cors());
 
 //routes
-app.use('/app/auth',authRouter)
-app.use('/app/matching',matchingRouter);
+app.use('/api/auth',authRouter)
+app.use('/api/matching',matchingRouter);
 
 //test API
 app.get ('/api/test',async(req, res)=>{

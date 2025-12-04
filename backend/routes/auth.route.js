@@ -1,9 +1,10 @@
 
 const express = require('express');
 const router = express.Router();
-const authService = require('../services/auth.service'); 
+//const authService = require('../services/auth.service'); 
+const authService= require('../services/auth.service');
 
-router.post('/register', async (req, res) => {
+router.post("/register", async (req, res) => {
     try {
         const { role, email, password, phone_no, full_name, district } = req.body; 
 
