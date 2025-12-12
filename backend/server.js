@@ -4,7 +4,9 @@ const db = require('./db');
 const cors = require('cors');
 const authRouter= require('./routes/auth.route');
 const matchingRouter = require('./routes/matching.route');
-const app= express();
+const reviewRouter= require('./routes/review.route');
+
+ const app= express();
 const PORT =process.env.PORT || 3000;
 
 app.use(express.json());
@@ -13,6 +15,8 @@ app.use(cors());
 //routes
 app.use('/api/auth',authRouter)
 app.use('/api/matching',matchingRouter);
+app.use('/api/review',reviewRouter);
+
 
 //test API
 app.get ('/api/test',async(req, res)=>{
