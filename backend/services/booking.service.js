@@ -56,7 +56,7 @@ const updateBookingStatus= async (bookingId, newStatus, userId )=>{
         WHERE booking_id = $2
         RETURNING booking_id, booking_status`;
 
-    const result = await db.query(updateSql, [status, bookingId]);
+    const result = await db.query(updateSql, [newStatus, bookingId]);
     return result.rows[0];
 
 };
@@ -78,7 +78,7 @@ const getBookingsByUser= async(userId, userRole)=>{
     WHERE b.${fkColumn} = $1 
     ORDER BY b.requested_at DESC`;
 
-    constresult= await db.query(sql, [profileId]);
+    const result= await db.query(sql, [profileId]);
     return result.rows;
 
 };

@@ -13,7 +13,7 @@ const getFamilyId=async(userId)=>{
 };
 
 const addReview=async(userId,bookingID,ratingScore,comments)=>{
-    const client=awaitdb.pool.connect();
+    const client=await db.pool.connect();
     try{
         await client.query('BEGIN'); 
 
