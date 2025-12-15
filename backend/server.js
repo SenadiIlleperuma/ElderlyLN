@@ -5,6 +5,8 @@ const cors = require('cors');
 const authRouter= require('./routes/auth.route');
 const matchingRouter = require('./routes/matching.route');
 const reviewRouter= require('./routes/review.route');
+const bookingRouter= require('./routes/booking.route');
+const governanceRouter= require('./routes/governance.route');
 
  const app= express();
 const PORT =process.env.PORT || 3000;
@@ -16,6 +18,8 @@ app.use(cors());
 app.use('/api/auth',authRouter)
 app.use('/api/matching',matchingRouter);
 app.use('/api/review',reviewRouter);
+app.use('/api/booking',bookingRouter);
+app.use('/api/governance',governanceRouter);
 
 
 //test API
