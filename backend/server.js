@@ -8,7 +8,7 @@ const matchingRouter = require("./routes/matching.route");
 const reviewRouter = require("./routes/review.route");
 const bookingRouter = require("./routes/booking.route");
 const governanceRouter = require("./routes/governance.route");
-
+const profileRouter = require("./routes/profile.route");
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -29,6 +29,7 @@ app.use("/api/matching", matchingRouter);
 app.use("/api/review", reviewRouter);
 app.use("/api/booking", bookingRouter);
 app.use("/api/governance", governanceRouter);
+app.use("/api/profile", profileRouter);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`ElderlyLN Backend running on port ${PORT}`);
