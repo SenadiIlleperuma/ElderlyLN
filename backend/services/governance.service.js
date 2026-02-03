@@ -1,101 +1,37 @@
-const db= require('../db');
+const db = require("../db");
 
-const getProfileId=async(userId, role)=>{
-    const table= role==='family' ? 'family' : 'caregiver';
-    const idColumn= role==='family' ? 'family_id' : 'caregiver_id';
+async function fileComplaint(userId, bookingId, reason, role) {
+  if (role !== "family") {
+    throw new Error("Forbidden: Only family users can file complaints.");
+  }
 
-    const sql= `SELECT ${idColumn} FROM ${table} WHERE user_fk=$1`;
-    const result= await db.query(sql,[userId]);
-    
-    if(result.rows.length===0){
-         throw new Error (`${role.charAt(0).toUpperCase()+role.slice(1)} profile not found.`);
-    }
-    return result.rows[0][idColumn];
-};
+  const bq = `
+    SELECT b.booking_id, f.user_fk AS family_user_fk
+    FROM booking b
+    JOIN family f ON f.family_id = b.family_fk
+    WHERE b.booking_id = $1
+  `;
+  const bRes = await db.query(bq, [bookingId]);
 
-const fileComplaint=async(userId,bookingId,complaintReason, role)=>{
-    if(role !=='family' && role !=='caregiver'){
-        throw new Error ('Invalid user role for filing complaint.');
-    }
+  if (bRes.rows.length === 0) throw new Error("Invalid bookingId.");
+  if (bRes.rows[0].family_user_fk !== userId) {
+    throw new Error("Forbidden: this booking is not yours.");
+  }
 
-    const profileId= await getProfileId (userId, role);
-    const profileFK=role==='family' ? 'family_fk' : 'caregiver_fk';
+  const dq = `SELECT 1 FROM complaint WHERE booking_fk = $1 LIMIT 1`;
+  const dRes = await db.query(dq, [bookingId]);
+  if (dRes.rows.length > 0) {
+    throw new Error("Complaint already filed for this booking.");
+  }
 
-    const client= await db.pool.connect();
-    try{
-        await client.query('BEGIN');
+  const iq = `
+    INSERT INTO complaint (booking_fk, filer_fk, description, status, resolution_sla)
+    VALUES ($1, $2, $3, 'Submitted', NOW() + INTERVAL '24 hours')
+    RETURNING complaint_id, booking_fk, filer_fk, submitted_at, status, resolution_sla
+  `;
 
-        const bookingCheckSql= `
-            SELECT booking_id FROM booking 
-            WHERE booking_id=$1 AND ${profileFK}=$2
-        `;
-        const bookingCheck= await client.query(bookingCheckSql,[bookingId, profileId]);
+  const iRes = await db.query(iq, [bookingId, userId, reason]);
+  return iRes.rows[0];
+}
 
-        if(bookingCheck.rows.length===0){
-            throw new Error ('Booking not found for this user.');
-        };
-        const complaintSql= `
-        INSERT INTO complaint (booking_fk, ${profileFK}, reason, filed_by_role, status)
-            VALUES ($1, $2, $3, $4, 'Pending')
-            RETURNING complaint_id
-        `;
-        const values = [bookingId, profileId, complaintReason, role];
-        const result = await client.query(complaintSql, values);
-
-        await client.query('UPDATE booking SET has_complaint = TRUE WHERE booking_id = $1', [bookingId]);
-
-        await client.query('COMMIT');
-        return result.rows[0];
-} catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-    } finally {
-        client.release();
-    }
-};
-
-const resolveComplaint=async(complaintId,resolutionAction,newStatus,grantBadge=false)=>{
-    const client= await db.pool.connect();
-    try{
-        await client.query('BEGIN');
-
-        const updateComplaintSql= `
-        UPDATE complaint 
-        SET status = $1, resolution_note = $2, resolved_at = NOW()
-            WHERE complaint_id = $3
-            RETURNING booking_fk
-        `;
-        const result= await client.query(updateComplaintSql, [newStatus, resolutionAction, complaintId]);
-        
-        if(result.rows.length===0){
-            throw new Error ('Complaint not found.');
-        }
-
-        if(grantBadge){
-            const bookingFK= result.rows[0].booking_fk;
-            const caregiverSql= `
-            SELECT caregiver_fk FROM booking WHERE booking_id = $1
-            `;
-            const caregiverResult= await client.query(caregiverSql, [bookingFK]);
-            const caregiverId= caregiverResult.rows[0].caregiver_fk;
-
-            await client.query('UPDATE caregiver SET verification_badges = array_append(verification_badges, $1) WHERE caregiver_id = $2',
-                ['Verified by Admin', caregiverId]);
-            }
-        await client.query('COMMIT');
-        return{
-            complaint_id: complaintId, status: newStatus,badgeGranted: grantBadge};
-        } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-    } finally {
-        client.release();
-        }
-    };
-
-
-
-module.exports={
-    fileComplaint,
-    resolveComplaint
-};
+module.exports = { fileComplaint };

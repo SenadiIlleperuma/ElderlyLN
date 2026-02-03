@@ -48,7 +48,6 @@ const registerUser = async (role, email, password, phone_no, full_name, district
     const pwCol = await getPasswordColumn();
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Build query depending on real DB column name
     const userInsertSql = `
       INSERT INTO "user" (email, phone_no, ${pwCol}, role)
       VALUES ($1, $2, $3, $4)
