@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { AuthStackParamList, BookingRow } from "../../RootNavigator";
 import { theme } from "../../constants/theme";
@@ -29,9 +30,7 @@ function cleanText(v: any) {
 
 function formatShiftDate(iso: string) {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return { month: "—", day: "—" };
-  }
+  if (Number.isNaN(d.getTime())) return { month: "—", day: "—" };
   const month = d.toLocaleString("en-US", { month: "short" }).toUpperCase();
   const day = String(d.getDate());
   return { month, day };
@@ -43,55 +42,103 @@ function formatShiftTime(iso: string) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function normStatus(s: any) {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase(); // requested/accepted/completed/declined
+}
+
+function isSameMonth(d: Date, ref: Date) {
+  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
+}
+
+function toNumber(v: any) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatLKR(n: number) {
+  const rounded = Math.round(n);
+  return `Rs ${rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+}
+
 export default function CaregiverHomeScreen({ navigation }: Props) {
   const { t } = useTranslation();
+
   const [name, setName] = useState<string>("");
-
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState<boolean>(true);
 
   useEffect(() => {
     (async () => {
-      const u = await getUser();
-      if (u?.name) setName(u.name);
+     const u = (await getUser()) as any;
+     const nm = u?.name || u?.full_name || u?.fullName || "";
+     if (nm) setName(String(nm));
     })();
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get("/booking/myBookings");
-        const data = Array.isArray(res.data) ? res.data : [];
+  const loadBookings = useCallback(async () => {
+    try {
+      setLoadingBookings(true);
+      const res = await api.get("/booking/myBookings");
+      const data = Array.isArray(res.data) ? res.data : [];
 
-        const mapped: BookingRow[] = data.map((r: any) => ({
-          booking_id: String(r.booking_id ?? ""),
-          family_fk: String(r.family_fk ?? ""),
-          caregiver_fk: String(r.caregiver_fk ?? ""),
-          requested_at: String(r.requested_at ?? ""),
-          service_date: String(r.service_date ?? ""),
-          booking_status: (r.booking_status ?? "Requested") as BookingRow["booking_status"],
+      const mapped: BookingRow[] = data.map((r: any) => ({
+        booking_id: String(r.booking_id ?? ""),
+        family_fk: String(r.family_fk ?? ""),
+        caregiver_fk: String(r.caregiver_fk ?? ""),
+        requested_at: String(r.requested_at ?? ""),
+        service_date: String(r.service_date ?? ""),
+        booking_status: (r.booking_status ?? "Requested") as BookingRow["booking_status"],
 
-          family_name: r.family_name ?? null,
-          family_district: r.family_district ?? null,
-          family_care_needs: Array.isArray(r.family_care_needs) ? r.family_care_needs : null,
+        family_name: r.family_name ?? null,
+        family_district: r.family_district ?? null,
+        family_care_needs: Array.isArray(r.family_care_needs) ? r.family_care_needs : null,
 
-          caregiver_service_type: r.caregiver_service_type ?? null,
-          caregiver_time_period: r.caregiver_time_period ?? null,
-          caregiver_languages: r.caregiver_languages ?? null,
-          caregiver_expected_rate: r.caregiver_expected_rate ?? null,
-        }));
+        caregiver_service_type: r.caregiver_service_type ?? null,
+        caregiver_time_period: r.caregiver_time_period ?? null,
+        caregiver_languages: r.caregiver_languages ?? null,
+        caregiver_expected_rate: r.caregiver_expected_rate ?? null,
+      }));
 
-        setBookings(mapped);
-      } catch (e) {
-        setBookings([]);
-      }
-    })();
+      setBookings(mapped);
+    } catch (e) {
+      setBookings([]);
+    } finally {
+      setLoadingBookings(false);
+    }
   }, []);
 
-  const UPCOMING: Shift[] = useMemo(() => {
+  useFocusEffect(
+    useCallback(() => {
+      loadBookings();
+    }, [loadBookings])
+  );
+
+  const {
+    jobRequestsCount,
+    completedCount,
+    totalEarnings,
+    monthEarnings,
+    upcomingShifts,
+  } = useMemo(() => {
     const now = new Date();
+    const thisMonth = now;
 
-    const upcomingAccepted = bookings
-      .filter((b) => b.booking_status === "Accepted")
+    const requested = bookings.filter((b) => normStatus(b.booking_status) === "requested");
+    const completed = bookings.filter((b) => normStatus(b.booking_status) === "completed");
+    const accepted = bookings.filter((b) => normStatus(b.booking_status) === "accepted");
+
+    const totalEarn = completed.reduce((sum, b) => sum + toNumber(b.caregiver_expected_rate), 0);
+
+    const monthEarn = completed.reduce((sum, b) => {
+      const d = new Date(b.service_date);
+      if (Number.isNaN(d.getTime())) return sum;
+      if (!isSameMonth(d, thisMonth)) return sum;
+      return sum + toNumber(b.caregiver_expected_rate);
+    }, 0);
+
+    const upcomingAccepted = accepted
       .filter((b) => {
         const d = new Date(b.service_date);
         return !Number.isNaN(d.getTime()) && d >= now;
@@ -99,24 +146,22 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
       .sort((a, b) => new Date(a.service_date).getTime() - new Date(b.service_date).getTime())
       .slice(0, 3);
 
-    return upcomingAccepted.map((b) => {
+    const shifts: Shift[] = upcomingAccepted.map((b) => {
       const { month, day } = formatShiftDate(b.service_date);
-
       const district = cleanText(b.family_district);
       const family = cleanText(b.family_name) || t("family_generic");
       const title = district ? `${family} • ${district}` : family;
-
       const start = formatShiftTime(b.service_date);
-      const time = start !== "—" ? `${start}` : "—";
-
-      return {
-        id: b.booking_id,
-        month,
-        day,
-        title,
-        time,
-      };
+      return { id: b.booking_id, month, day, title, time: start !== "—" ? start : "—" };
     });
+
+    return {
+      jobRequestsCount: requested.length,
+      completedCount: completed.length,
+      totalEarnings: totalEarn,
+      monthEarnings: monthEarn,
+      upcomingShifts: shifts,
+    };
   }, [bookings, t]);
 
   return (
@@ -132,22 +177,34 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
 
         {!!name && <Text style={styles.greeting}>{t("hi_name", { name })}</Text>}
 
+        {/* Earnings Card */}
         <View style={styles.bigCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.bigLabel}>{t("total_earnings")}</Text>
-            <Text style={styles.bigValue}>Rs 45,200</Text>
+
+            {loadingBookings ? (
+              <View style={{ marginTop: 10 }}>
+                <ActivityIndicator color="#fff" />
+              </View>
+            ) : (
+              <Text style={styles.bigValue}>{formatLKR(totalEarnings)}</Text>
+            )}
 
             <View style={styles.bigDivider} />
 
             <View style={styles.bigBottom}>
               <View>
                 <Text style={styles.smallLabel}>{t("this_month")}</Text>
-                <Text style={styles.smallValue}>+ Rs 12,400</Text>
+                <Text style={styles.smallValue}>
+                  {loadingBookings ? "—" : `+ ${formatLKR(monthEarnings)}`}
+                </Text>
               </View>
 
               <View>
                 <Text style={styles.smallLabel}>{t("jobs_done")}</Text>
-                <Text style={styles.smallValue}>24 {t("visits")}</Text>
+                <Text style={styles.smallValue}>
+                  {loadingBookings ? "—" : `${completedCount} ${t("visits")}`}
+                </Text>
               </View>
             </View>
           </View>
@@ -157,13 +214,16 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {/* Tiles */}
         <View style={styles.tilesRow}>
           <Pressable style={styles.tile} onPress={() => navigation.navigate("JobRequests")}>
             <View style={styles.tileIconWrap}>
               <Ionicons name="briefcase-outline" size={22} color={theme.colors.primary} />
             </View>
             <Text style={styles.tileTitle}>{t("job_requests")}</Text>
-            <Text style={styles.tileSub}>3 {t("new_match")}</Text>
+            <Text style={styles.tileSub}>
+              {loadingBookings ? "—" : `${jobRequestsCount} ${t("new_match")}`}
+            </Text>
           </Pressable>
 
           <Pressable style={styles.tile} onPress={() => navigation.navigate("CaregiverEditProfile")}>
@@ -175,6 +235,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
+        {/* Upcoming shifts */}
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>{t("upcoming_shifts")}</Text>
           <Pressable onPress={() => navigation.navigate("CaregiverAlerts")}>
@@ -183,7 +244,21 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
         </View>
 
         <View style={{ marginTop: 10, gap: 12 }}>
-          {UPCOMING.length === 0 ? (
+          {loadingBookings ? (
+            <View style={styles.shiftCard}>
+              <View style={styles.dateBox}>
+                <Text style={styles.month}>—</Text>
+                <Text style={styles.day}>—</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.shiftTitle}>{t("loading_requests") || "Loading..."}</Text>
+                <Text style={styles.shiftTime}> </Text>
+              </View>
+              <View style={styles.clock}>
+                <ActivityIndicator />
+              </View>
+            </View>
+          ) : upcomingShifts.length === 0 ? (
             <View style={styles.shiftCard}>
               <View style={styles.dateBox}>
                 <Text style={styles.month}>—</Text>
@@ -200,7 +275,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
               </View>
             </View>
           ) : (
-            UPCOMING.map((s) => (
+            upcomingShifts.map((s) => (
               <View key={s.id} style={styles.shiftCard}>
                 <View style={styles.dateBox}>
                   <Text style={styles.month}>{s.month}</Text>

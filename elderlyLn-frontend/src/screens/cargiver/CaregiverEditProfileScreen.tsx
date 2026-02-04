@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Alert } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -7,10 +7,24 @@ import { useTranslation } from "react-i18next";
 
 import { AuthStackParamList } from "../../RootNavigator";
 import { theme } from "../../constants/theme";
+import { api } from "../../api/api";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "CaregiverEditProfile">;
-
 type Chip = { id: string; label: string };
+
+const SPEC_MAP: Record<string, string> = {
+  full: "Full-time",
+  part: "Part-time",
+  nursing: "Nursing care",
+  companionship: "Companionship",
+  special: "Special needs",
+};
+
+const LANG_MAP: Record<string, string> = {
+  si: "Sinhala",
+  ta: "Tamil",
+  en: "English",
+};
 
 export default function CaregiverEditProfileScreen({ navigation }: Props) {
   const { t } = useTranslation();
@@ -35,26 +49,100 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
     [t]
   );
 
-  const [displayName, setDisplayName] = useState("Aruni Kumari");
-  const [rate, setRate] = useState("1200");
-  const [expYears, setExpYears] = useState("8");
-  const [location, setLocation] = useState("Colombo");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>(["full", "part", "nursing"]);
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["si", "en"]);
+  const [displayName, setDisplayName] = useState("");
+  const [rate, setRate] = useState("");
+  const [expYears, setExpYears] = useState("");
+  const [location, setLocation] = useState("");
+
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
 
   const toggle = (id: string, selected: string[], setSelected: (x: string[]) => void) => {
     if (selected.includes(id)) setSelected(selected.filter((x) => x !== id));
     else setSelected([...selected, id]);
   };
 
-  const onSave = () => {
-    Alert.alert(
-      t("saved_demo_title"),
-      `${t("saved_demo_msg")}\n\n${t("display_name")}: ${displayName}\n${t("hourly_rate_lkr")}: ${rate}\n${t("years_of_exp")}: ${expYears}\n${t("service_location")}: ${location}`
-    );
-    navigation.goBack();
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await api.get("/profile/caregiver/me");
+        const c = res.data;
+
+        setDisplayName(c.full_name ?? "");
+        setRate(c.expected_rate != null ? String(c.expected_rate) : "");
+        setExpYears(c.experience_years != null ? String(c.experience_years) : "");
+        setLocation(c.district ?? "");
+
+        const dbSpecs: string[] = Array.isArray(c.care_category) ? c.care_category : [];
+        const uiSpecs = Object.keys(SPEC_MAP).filter((k) => dbSpecs.includes(SPEC_MAP[k]));
+        setSelectedSpecialties(uiSpecs);
+
+        const dbLangs: string[] = Array.isArray(c.languages_spoken) ? c.languages_spoken : [];
+        const uiLangs = Object.keys(LANG_MAP).filter((k) => dbLangs.includes(LANG_MAP[k]));
+        setSelectedLanguages(uiLangs);
+      } catch (e: any) {
+        Alert.alert(t("error") || "Error", e?.response?.data?.message || "Failed to load caregiver profile.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [t]);
+
+  const onSave = async () => {
+    const expected_rate = rate.trim() ? Number(rate) : null;
+    const experience_years = expYears.trim() ? Number(expYears) : null;
+
+    if (!displayName.trim() || !location.trim()) {
+      Alert.alert(t("failed") || "Failed", "Display name and district are required.");
+      return;
+    }
+    if (expected_rate != null && Number.isNaN(expected_rate)) {
+      Alert.alert(t("failed") || "Failed", "Hourly rate must be a number.");
+      return;
+    }
+    if (experience_years != null && Number.isNaN(experience_years)) {
+      Alert.alert(t("failed") || "Failed", "Years of experience must be a number.");
+      return;
+    }
+
+    const care_category = selectedSpecialties.map((id) => SPEC_MAP[id]).filter(Boolean);
+    const languages_spoken = selectedLanguages.map((id) => LANG_MAP[id]).filter(Boolean);
+
+    try {
+      setSaving(true);
+      await api.put("/profile/caregiver/me", {
+        full_name: displayName.trim(),
+        district: location.trim(),
+        expected_rate,
+        experience_years,
+        care_category,
+        languages_spoken,
+
+          });
+
+      Alert.alert(t("success_title") || "Success", "Caregiver profile updated.");
+      navigation.goBack();
+    } catch (e: any) {
+      Alert.alert(t("failed") || "Failed", e?.response?.data?.message || "Could not save profile.");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.bg }}>
+        <ActivityIndicator />
+        <Text style={{ marginTop: 10, fontWeight: "800", color: theme.colors.muted }}>
+          {t("loading_requests") || "Loading..."}
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -72,11 +160,10 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
         <View style={styles.photoWrap}>
           <View style={styles.photo} />
           <Pressable
-            onPress={() => Alert.alert(t("demo"), t("photo_change_demo"))}
+            onPress={() => Alert.alert(t("demo"), "We will connect photo upload next (needs backend upload).")}
             style={styles.cameraBtn}
           >
             <Ionicons name="camera" size={18} color="#fff" />
@@ -84,49 +171,22 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
         </View>
 
         <Text style={styles.label}>{t("display_name")}</Text>
-        <TextInput
-          value={displayName}
-          onChangeText={setDisplayName}
-          style={styles.input}
-          placeholder={t("display_name_ph")}
-          placeholderTextColor="#9aa3af"
-        />
+        <TextInput value={displayName} onChangeText={setDisplayName} style={styles.input} placeholder={t("display_name_ph")} />
 
         <View style={styles.gridRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>{t("hourly_rate_lkr")}</Text>
-            <TextInput
-              value={rate}
-              onChangeText={setRate}
-              keyboardType="numeric"
-              style={styles.input}
-              placeholder="1200"
-              placeholderTextColor="#9aa3af"
-            />
+            <TextInput value={rate} onChangeText={setRate} keyboardType="numeric" style={styles.input} />
           </View>
 
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>{t("years_of_exp")}</Text>
-            <TextInput
-              value={expYears}
-              onChangeText={setExpYears}
-              keyboardType="numeric"
-              style={styles.input}
-              placeholder="8"
-              placeholderTextColor="#9aa3af"
-            />
+            <TextInput value={expYears} onChangeText={setExpYears} keyboardType="numeric" style={styles.input} />
           </View>
         </View>
 
-        {/* Location */}
         <Text style={styles.label}>{t("service_location")}</Text>
-        <TextInput
-          value={location}
-          onChangeText={setLocation}
-          style={styles.input}
-          placeholder={t("service_location_ph")}
-          placeholderTextColor="#9aa3af"
-        />
+        <TextInput value={location} onChangeText={setLocation} style={styles.input} />
 
         <Text style={[styles.sectionTitle, { marginTop: 14 }]}>{t("specialties")}</Text>
         <View style={styles.chipsWrap}>
@@ -164,8 +224,8 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        <Pressable onPress={onSave} style={styles.saveBtn}>
-          <Ionicons name="save-outline" size={18} color="#fff" />
+        <Pressable onPress={onSave} style={styles.saveBtn} disabled={saving}>
+          {saving ? <ActivityIndicator color="#fff" /> : <Ionicons name="save-outline" size={18} color="#fff" />}
           <Text style={styles.saveText}>{t("save_changes")}</Text>
         </Pressable>
       </View>
