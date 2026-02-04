@@ -313,7 +313,18 @@
   "confirm_request_action_title": "{{status}} කරන්නද?",
   "mark_completed": "සම්පූර්ණයි ලෙස ලකුණු කරන්න",
   "no_upcoming_shifts": "ඉදිරියේ සේවා මාරු නැත",
-"no_upcoming_shifts_sub": "පිළිගත් වෙන්කිරීම් මෙහි පෙන්වයි."
+"no_upcoming_shifts_sub": "පිළිගත් වෙන්කිරීම් මෙහි පෙන්වයි.",
+
+  "management_center": "කළමනාකරණ මධ්‍යස්ථානය",
+  "verification_hub": "සත්‍යාපන සහ හබ්",
+  "pending_reviews": "බලාපොරොත්තු සමාලෝචන {{count}}",
+  "urgent_issues": "තදින් අවධානය යොමු කළ යුතු ගැටළු",
+  "urgent_issues_sub": "හබ් තුළ අවධානයට ලක් කළ යුතු විසඳා නොමැති පැමිණිලි ඇත.",
+  "go_to_hub": "හබ් වෙත යන්න",
+  "unresolved_count": "විසඳා නොමැති පැමිණිලි {{count}}යි.",
+"admin_hub": "පරිපාලක මධ්යස්ථානය"
+  
+
 
 
 

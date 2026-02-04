@@ -308,7 +308,20 @@
   "write_brief_review": "Write a brief review...",
   "later": "Later",
   "submit_review": "Submit Review",
- "rate_review": "Rate & Review"
+ "rate_review": "Rate & Review",
+ 
+
+  "management_center": "Management Center",
+  "verification_hub": "Verification & Hub",
+  "pending_reviews": "{{count}} Pending Reviews",
+  "urgent_issues": "Urgent Issues",
+  "urgent_issues_sub": "There are unresolved disputes requiring attention in the Hub.",
+  "go_to_hub": "GO TO HUB",
+  "unresolved_count": "{{count}} unresolved complaints.",
+
+ "admin_hub": "Admin Hub"
+
+
  }
 
 
