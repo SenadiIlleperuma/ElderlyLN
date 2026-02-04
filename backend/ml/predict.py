@@ -43,7 +43,6 @@ def predict_matches(payload, model_path):
 
     rows = []
     for cg in caregivers:
-        # Extract first language if multiple
         languages = cg.get("languages_spoken", "Sinhala")
         if isinstance(languages, str):
             if ',' in languages:
