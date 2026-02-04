@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -10,59 +10,106 @@ import { useFocusEffect } from "@react-navigation/native";
 import { theme } from "../../constants/theme";
 import { AuthStackParamList } from "../../RootNavigator";
 import FamilyBottomNav from "../../components/FamilyBottomNav";
+import { api } from "../../api/api";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "FamilyHome">;
 
-type BookingStatus = "UPCOMING" | "COMPLETED" | "REQUESTED";
+type BookingRow = {
+  booking_id: string;
+  service_date: string;
+  booking_status: "Requested" | "Accepted" | "Declined" | "Completed" | "Cancelled";
+  caregiver_name?: string | null;
+  caregiver_district?: string | null;
+  caregiver_service_type?: string | null;
+  caregiver_time_period?: string | null;
+};
 
-const recentBookings = [
-  { id: "b1", name: "Sahan Perera", date: "Oct 24, 2023", service: "Post-Op", status: "UPCOMING" as BookingStatus },
-  { id: "b2", name: "Priyani Fernando", date: "Oct 18, 2023", service: "Dementia Care", status: "COMPLETED" as BookingStatus },
-];
+type BookingStatusUI = "UPCOMING" | "COMPLETED" | "REQUESTED";
+
+function formatShortDate(iso: string) {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function clean(v: any) {
+  const s = String(v ?? "").trim();
+  if (!s || s === "not_set" || s === "null" || s === "undefined") return "";
+  return s;
+}
+
+function toUiStatus(s: BookingRow["booking_status"]): BookingStatusUI {
+  if (s === "Completed") return "COMPLETED";
+  if (s === "Requested") return "REQUESTED";
+  if (s === "Accepted") return "UPCOMING";
+  return "REQUESTED";
+}
 
 export default function FamilyHomeScreen({ navigation }: Props) {
   const { t } = useTranslation();
+
   const [fullName, setFullName] = useState<string>("");
+  const [recent, setRecent] = useState<BookingRow[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadUserName = async () => {
     try {
       const userStr = await AsyncStorage.getItem("user");
-      console.log("Home: AsyncStorage user =", userStr);
-
       if (!userStr) {
         setFullName("");
         return;
       }
-
       const user = JSON.parse(userStr);
-
       const name =
         user?.full_name ||
         user?.fullName ||
         user?.name ||
         user?.fullname ||
         "";
-
       setFullName(String(name || ""));
-    } catch (e) {
-      console.log("Home: failed to read user from storage", e);
+    } catch {
       setFullName("");
+    }
+  };
+
+  const fetchRecentBookings = async () => {
+    try {
+      setLoadingRecent(true);
+      const res = await api.get("/booking/myBookings");
+      const all: BookingRow[] = Array.isArray(res.data) ? res.data : [];
+      setRecent(all.slice(0, 2)); 
+    } catch (err: any) {
+      console.log("Home recent bookings error:", err?.response?.data || err?.message);
+      setRecent([]);
+    } finally {
+      setLoadingRecent(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       loadUserName();
+      fetchRecentBookings();
     }, [])
   );
 
-  const statusLabel = (s: BookingStatus) => {
-    if (s === "UPCOMING") return t("status_upcoming");
-    if (s === "COMPLETED") return t("status_completed");
-    return t("status_requested");
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadUserName();
+    await fetchRecentBookings();
+    setRefreshing(false);
+  }, []);
+
+  const statusLabel = (s: BookingStatusUI) => {
+    if (s === "UPCOMING") return t("status_upcoming") || "Upcoming";
+    if (s === "COMPLETED") return t("status_completed") || "Completed";
+    return t("status_requested") || "Requested";
   };
 
-  const Badge = ({ status }: { status: BookingStatus }) => {
+  const Badge = ({ status }: { status: BookingStatusUI }) => {
     const bg = status === "UPCOMING" ? "#E8F1FF" : status === "COMPLETED" ? "#E7F8EE" : "#FFF2E0";
     const txt = status === "UPCOMING" ? "#2E6BFF" : status === "COMPLETED" ? "#1F8A4C" : "#B25B00";
     return (
@@ -84,14 +131,17 @@ export default function FamilyHomeScreen({ navigation }: Props) {
           <Text style={styles.logoText}>E</Text>
         </View>
 
-        <Text style={styles.headerTitle}>{t("nav_home")}</Text>
+        <Text style={styles.headerTitle}>{t("nav_home") || "Home"}</Text>
 
         <Pressable onPress={onLogout} style={styles.headerBtn}>
           <Ionicons name="log-out-outline" size={22} color={theme.colors.muted} />
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         <View style={styles.greetCard}>
           <View style={styles.greetIcon}>
             <Text style={{ fontSize: 22 }}>🏠</Text>
@@ -99,9 +149,9 @@ export default function FamilyHomeScreen({ navigation }: Props) {
 
           <View style={{ flex: 1 }}>
             <Text style={styles.greetTitle}>
-              {t("hello_name", { name: fullName?.trim() ? fullName : t("guest") })}
+              {t("hello_name", { name: fullName?.trim() ? fullName : (t("guest") || "Guest") })}
             </Text>
-            <Text style={styles.greetSub}>{t("welcome_portal")}</Text>
+            <Text style={styles.greetSub}>{t("welcome_portal") || "Welcome to your family care portal."}</Text>
           </View>
 
           <Pressable onPress={() => navigation.navigate("EditProfile")} style={styles.profileBtn}>
@@ -110,34 +160,59 @@ export default function FamilyHomeScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.bigCard}>
-          <Text style={styles.bigTitle}>{t("find_support")}</Text>
-          <Text style={styles.bigSub}>{t("find_support_sub")}</Text>
+          <Text style={styles.bigTitle}>{t("find_support") || "Find support"}</Text>
+          <Text style={styles.bigSub}>{t("find_support_sub") || "Let our AI help you find the best caregiver match."}</Text>
 
           <Pressable onPress={() => navigation.navigate("FindCaregiver")} style={styles.searchPill}>
             <Ionicons name="search" size={18} color={theme.colors.primary} />
-            <Text style={styles.searchPillText}>{t("start_search")}</Text>
+            <Text style={styles.searchPillText}>{t("start_search") || "Start Search"}</Text>
           </Pressable>
         </View>
 
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>{t("recent_bookings")}</Text>
+          <Text style={styles.sectionTitle}>{t("recent_bookings") || "Recent bookings"}</Text>
           <Pressable onPress={() => navigation.navigate("MyBookings", {})}>
-            <Text style={styles.link}>{t("view_all")}</Text>
+            <Text style={styles.link}>{t("view_all") || "View all"}</Text>
           </Pressable>
         </View>
 
-        {recentBookings.map((b) => (
-          <Pressable key={b.id} onPress={() => navigation.navigate("MyBookings", {})} style={styles.bookingCard}>
-            <View style={styles.avatar} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.bookingName}>{b.name}</Text>
-              <Text style={styles.bookingMeta}>
-                {b.date} • {b.service}
-              </Text>
-            </View>
-            <Badge status={b.status} />
-          </Pressable>
-        ))}
+        {loadingRecent ? (
+          <View style={{ paddingVertical: 18, alignItems: "center" }}>
+            <ActivityIndicator />
+            <Text style={{ marginTop: 8, color: theme.colors.muted, fontWeight: "800" }}>
+              {t("loading_bookings") || "Loading bookings..."}
+            </Text>
+          </View>
+        ) : recent.length === 0 ? (
+          <View style={styles.emptyRecent}>
+            <Text style={styles.emptyRecentTitle}>{t("no_bookings_yet") || "No bookings yet"}</Text>
+            <Text style={styles.emptyRecentSub}>{t("no_bookings_sub") || "Book a caregiver and your requests will appear here."}</Text>
+          </View>
+        ) : (
+          recent.map((b) => {
+            const uiStatus = toUiStatus(b.booking_status);
+            const caregiverName = clean(b.caregiver_name) || (t("caregiver_generic") || "Caregiver");
+            const date = formatShortDate(b.service_date);
+            const service = clean(b.caregiver_service_type) || (t("service_type") || "Service");
+
+            return (
+              <Pressable
+                key={b.booking_id}
+                onPress={() => navigation.navigate("MyBookings", {})}
+                style={styles.bookingCard}
+              >
+                <View style={styles.avatar} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.bookingName}>{caregiverName}</Text>
+                  <Text style={styles.bookingMeta}>
+                    {date} • {service}
+                  </Text>
+                </View>
+                <Badge status={uiStatus} />
+              </Pressable>
+            );
+          })
+        )}
 
         <View style={{ height: 110 }} />
       </ScrollView>
@@ -175,6 +250,7 @@ const styles = StyleSheet.create({
   },
   headerBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 12 },
   content: { padding: theme.spacing.lg },
+
   greetCard: {
     backgroundColor: theme.colors.card,
     borderRadius: 18,
@@ -203,6 +279,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   bigCard: { marginTop: 14, backgroundColor: theme.colors.primary, borderRadius: 20, padding: theme.spacing.lg },
   bigTitle: { color: "white", fontSize: 18, fontWeight: "900" },
   bigSub: { marginTop: 6, color: "rgba(255,255,255,0.85)", fontSize: 13, lineHeight: 18 },
@@ -218,6 +295,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   searchPillText: { fontWeight: "900", color: theme.colors.primary },
+
   sectionRow: {
     marginTop: 18,
     marginBottom: 10,
@@ -227,6 +305,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 15, fontWeight: "900", color: theme.colors.text },
   link: { fontWeight: "800", color: theme.colors.primary },
+
   bookingCard: {
     backgroundColor: theme.colors.card,
     borderRadius: 16,
@@ -241,6 +320,17 @@ const styles = StyleSheet.create({
   avatar: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#E9EEF8" },
   bookingName: { fontSize: 14, fontWeight: "900", color: theme.colors.text },
   bookingMeta: { marginTop: 2, fontSize: 12, color: theme.colors.muted },
+
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   badgeText: { fontSize: 11.5, fontWeight: "900" },
+
+  emptyRecent: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 16,
+  },
+  emptyRecentTitle: { fontWeight: "900", color: theme.colors.text, fontSize: 14 },
+  emptyRecentSub: { marginTop: 6, color: theme.colors.muted, fontWeight: "700" },
 });

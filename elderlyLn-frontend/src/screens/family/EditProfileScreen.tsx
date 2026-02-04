@@ -264,9 +264,7 @@ export default function EditProfileScreen({ navigation }: Props) {
               <Text style={styles.deleteText}>Delete account permanently</Text>
             </Pressable>
 
-            <Text style={styles.note}>
-              Deactivate = temporary (can log in again). Delete = permanent (cannot recover).
-            </Text>
+            
           </View>
 
           <View style={{ height: 40 }} />
@@ -398,5 +396,4 @@ const styles = StyleSheet.create({
   },
   deleteText: { color: "white", fontSize: 15, fontWeight: "900" },
 
-  note: { marginTop: 10, fontSize: 12, color: theme.colors.muted, fontWeight: "700" },
 });
