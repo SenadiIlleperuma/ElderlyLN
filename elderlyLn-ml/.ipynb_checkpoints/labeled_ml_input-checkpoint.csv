@@ -1,0 +1,24 @@
+" Age
+"," Gender
+","District
+",Education_Level,Qualifications,Years_Experience,Languages_Spoken,Care_Category,Care_Service_Type,Preferred_Time,Expected_Salary,Match_Decision
+26,Female,Colombo,Secondary/Short Course,"NVQ Level 3,NVQ Level 4,First Aid Certificate,Phlebotomy+Mental Health",1,"Sinhala,English",Elderly care,None,None,0,Accepted
+52,Male,Jaffna,Degree,NVQ Level 3,5,"English,Tamil",Elderly care,All-around,Full-day,0,Accepted
+24,Female,Kurunegala,Diploma,NVQ Level 3,0,"Sinhala,English",Patient care,All-around,Hourly,70000,Rejected
+47,Female,Colombo,Degree,NVQ Level 3,1,"Sinhala,English",Child care,Looking after,Half-day,40000,Accepted
+27,Male,Puttalam ,Degree,NVQ Level 3,0,"Sinhala,English,Tamil",Patient care,Looking after,Hourly ,10500,Rejected
+35,Female,Gampaha,Degree,NVQ Level 3,2,"Sinhala,English,Tamil",Patient care,Supervising,Full-day,90000,Accepted
+29,Female,Colombo,Diploma,NVQ Level 3,0,"Sinhala,English",Elderly care,Looking after,Hourly ,65000,Rejected
+32,Female,Hambantota,Degree,NVQ Level 3,0,"Sinhala,English",None,None,None,500000,Rejected
+53,Female,Colombo,Secondary,NVQ Level 3,0,"Sinhala,English",Finance ,Looking after,Hourly ,700,Rejected
+46,Female,Kandy,Degree,"NVQ Level 4,First Aid Certificate,Short caregiving course",5,"Sinhala,English","Elderly care,Child care","Looking after, All-around care",Half-day,100000,Accepted
+27,Female,Puttalam,Short Course,NVQ Level 3,1,"Sinhala,English","Elderly care,Disability care,Patient care,Palliative care,Domestic support","Cooking + looking after,All-around care",Half-day,200000,Accepted
+37,Female,Colombo,Short Course,Short Course,0.5,English,"Elderly care,Patient care",All-around,None,60000,Accepted
+33,Female,Colombo,Degree,NVQ Level 4,0,Sinhala,Elderly care,Looking after,Full-day,0,Rejected
+43,Male,Colombo,Diploma,NVQ Level 3,0,"Sinhala,English",Elderly care,Supervising,Hourly ,0,Rejected
+37,Female,Colombo ,Diploma/Short Courses,NVQ Level 3,0,"Sinhala,English",Elderly care,Cooking + looking after,Live-in,100000,Rejected
+43,Female,Colombo,Degree,NVQ Level 4,0.5,"Sinhala,English",Elderly care,All-around,Full-day,60000,Accepted
+21,Male,Colombo,Diploma,NVQ Level 3,0,"Sinhala,English",Elderly care,All-around,Full-day,60000,Rejected
+32,Male,Matara,Secondary,NVQ Level 3,1,"Sinhala,English","Elderly care,Patient care",Looking after,Half-day,0,Accepted
+27,Male,Matara,Secondary,NVQ Level 3,0,"Sinhala,English",Elderly care,Looking after,Hourly ,55000,Rejected
+28,Female,Rathnapura,Diploma,NVQ Level 3,0,Sinhala,Child care,All-around,Full-day,0,Rejected
