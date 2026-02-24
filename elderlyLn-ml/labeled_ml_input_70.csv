@@ -1,0 +1,74 @@
+Age,Gender,District,"Educational_Level
+",Qualifications,"Years_Experience 
+"," Languages_Spoken
+",Care_Category,Care_Service_Type,Preferred_Time,Expected_Salary,Match_Desicion
+26,Female,Colombo,Secondary/Short Course,"NVQ Level 3,NVQ Level 4,First Aid Certificate,Phlebotomy+Mental Health",1,"Sinhala,English",Elderly care,None,None,0,Accepted
+52,Male,Jaffna,Degree,NVQ Level 3,5,"English,Tamil",Elderly care,All-around,Full-day,0,Accepted
+24,Female,Kurunegala,Diploma,NVQ Level 3,0,"Sinhala,English",Patient care,All-around,Hourly,70000,Rejected
+47,Female,Colombo,Degree,NVQ Level 3,1,"Sinhala,English",Child care,Looking after,Half-day,40000,Accepted
+27,Male,Puttalam,Degree,NVQ Level 3,0,"Sinhala,English,Tamil",Patient care,Looking after,Hourly,10500,Rejected
+35,Female,Gampaha,Degree,NVQ Level 3,2,"Sinhala,English,Tamil",Patient care,Supervising,Full-day,90000,Accepted
+29,Female,Colombo,Diploma,NVQ Level 3,0,"Sinhala,English",Elderly care,Looking after,Hourly,65000,Rejected
+32,Female,Hambantota,Degree,NVQ Level 3,0,"Sinhala,English",None,None,None,500000,Rejected
+53,Female,Colombo,Secondary,NVQ Level 3,0,"Sinhala,English",Finance ,Looking after,Hourly,700,Rejected
+46,Female,Kandy,Degree,"NVQ Level 4,First Aid Certificate,Short caregiving course",5,"Sinhala,English","Elderly care,Child care","Looking after,All-around care",Half-day,100000,Accepted
+27,Female,Puttalam,Short Course,NVQ Level 3,1,"Sinhala,English","Elderly care,Disability care,Patient care,Palliative care,Domestic support","Cooking + looking after,All-around care",Half-day,200000,Accepted
+37,Female,Colombo,Short Course,Short Course,0.5,English,"Elderly care,Patient care",All-around,None,60000,Accepted
+33,Female,Colombo,Degree,NVQ Level 4,0,Sinhala,Elderly care,Looking after,Full-day,0,Rejected
+43,Male,Colombo,Diploma,NVQ Level 3,0,"Sinhala,English",Elderly care,Supervising,Hourly,0,Rejected
+37,Female,Colombo,Diploma/Short Course,NVQ Level 3,0,"Sinhala,English",Elderly care,Cooking + looking after,Live-in,100000,Rejected
+43,Female,Colombo,Degree,NVQ Level 4,0.5,"Sinhala,English",Elderly care,All-around,Full-day,60000,Accepted
+21,Male,Colombo,Diploma,NVQ Level 3,0,"Sinhala,English",Elderly care,All-around,Full-day,60000,Rejected
+32,Male,Matara,Secondary,NVQ Level 3,1,"Sinhala,English","Elderly care,Patient care",Looking after,Half-day,0,Accepted
+27,Male,Matara,Secondary,NVQ Level 3,0,"Sinhala,English",Elderly care,Looking after,Hourly,55000,Rejected
+28,Female,Ratnapura,Diploma,NVQ Level 3,0,Sinhala,Child care,All-around,Full-day,0,Rejected
+24,Female,Kalutara,Degree,"NVQ Level 4,Diploma in Caregiving",1,"Sinhala,English","Elderly care,Patient care",Looking after,Half-day,50000,Accepted
+32,Female,Ratnapura,Diploma,"NVQ Level 3,Diploma in Caregiving",2,Sinhala,"Elderly care,Domestic support",All-around,Half-day,75000,Accepted
+32,Male,Colombo,Degree,NVQ Level 3,1.5,"Sinhala,English",Patient care,All-around,Full-day,85000,Accepted
+28,Male,Colombo,Short Course,Short caregiving course,2.5,"Sinhala,English","Elderly care,Patient care",Looking after,Half-day,55000,Accepted
+36,Male,Kegalle,Diploma,"NVQ Level 3,Diploma in Caregiving",3,"Sinhala,English","Elderly care,Disability care,Patient care",Looking after,Full-day,"90,000-120,000",Accepted
+40,Female,Galle,Diploma,Diploma in Caregiving,4,"Sinhala,English","Elderly care,Child care,Domestic support",Cooking + looking after,Half-day,75000,Accepted
+37,Male,Kurunegala,Diploma/Short Course,"NVQ Level 3,Diploma in Caregiving",2.5,"Sinhala,English",Elderly care,Looking after,Hourly,1500,Accepted
+29,Female,Gampaha,Short Course/Degree,"NVQ Level 3,First Aid Certificate,Diploma in Caregiving",1.6,"Sinhala,English","Elderly care,Patient care",Looking after,Half-day,45000,Accepted
+45,Male,Vavuniya,Secondary/Diploma,NVQ Level 2,5.5,"Sinhala,Tamil","Elderly care,Disability care",Looking after,Full-day,95000,Accepted
+54,Male,Matara,Secondary/Short Course,Short caregiving course,4.5,"Sinhala,English",Elderly care,Looking after,Live-in,55000,Accepted
+39,Female,Kandy,Degree,"NVQ Level 3,First Aid Certificate",3.8,"Sinhala,English","Elderly care,Patient care",Looking after,Full-day,75000,Accepted
+58,Male,Matara,Secondary/Short Course,Short caregiving course,4,"Sinhala,English",Elderly care,Looking after,Live-in,65000,Accepted
+43,Male,Kurunegala,Secondary/Diploma,"NVQ Level 3,Diploma in Caregiving",2,"Sinhala,English",Child care,Looking after,Half-day,65000,Accepted
+39,Female,Colombo,Diploma,"NVQ Level 3,Diploma in Caregiving",1,"Sinhala,English","Elderly care,Child care",Looking after,Half-day,70000,Accepted
+43,Male,Galle,Diploma/Short Course,"First Aid Certificate,Diploma in Caregiving,Short caregiving course",3,"Sinhala,English",Disability care,Cooking + looking after,Full-day,0,Accepted
+47,Female,Kalutara,Diploma/Short Course,"NVQ Level 3,First Aid Certificate,Diploma in Caregiving,Short caregiving course",2,Sinhala- සිංහල,Elderly care,Looking after,Half-day,45000,Accepted
+51,Male,Colombo,Diploma/Degree,"First Aid Certificate,Diploma in Caregiving",2,"Sinhala,English",Disability care,"Looking after,Supervising",Live-in,75000,Accepted
+25,Female,Kalutara,Diploma,Diploma in Caregiving,0,"Sinhala,English",Child care,Looking after,Half-day,55000,Rejected
+58,Female,Ratnapura,Degree,"NVQ Level 3,First Aid Certificate",8,"Sinhala,English",Patient care,Looking after,Full-day,120000 - 150000,Accepted
+27,Female,Kegalle,Diploma/Short Course/Degree,"NVQ Level 3,Diploma in Caregiving,Short caregiving course",1,"Sinhala,English",Disability care,Looking after,Half-day,0,Accepted
+29,Female,Colombo,Secondary/Short Course,NVQ Level 3,0,Sinhala,Elderly care,Looking after,Half-day,45000,Rejected
+40,Female,Colombo,Diploma,NVQ Level 4,0,"Sinhala,English",Elderly care,Looking after,Full-day,60000,Rejected
+31,Female,Kalutara,Secondary/Diploma,NVQ Level 3,0,Sinhala,Elderly care,Cooking + looking after,Full-day,55000,Rejected
+32,Male,Matara,Secondary/Diploma,NVQ Level 3,0,"Sinhala,English",Elderly care,Looking after,Live-in,45000,Rejected
+20,Female,Kurunegala,Secondary/Diploma,NVQ Level 3,0,"Sinhala,English",Elderly care,Looking after,Half-day,35000,Rejected
+46,Female,Kandy,Secondary,"NVQ Level 3,NVQ Level 4",1,Sinhala,Elderly care,Looking after,Full-day,40000,Accepted
+41,Female,Colombo,Short Course,NVQ Level 4,0,Sinhala,Child care,Looking after,Full-day,45000,Rejected
+20,Female,Galle,Secondary,NVQ Level 3,0,"Sinhala,English","Elderly care,Domestic support",All-around,Full-day,50000,Rejected
+30,Female,Ratnapura,Diploma,NVQ Level 3,2,"Sinhala,English","Patient care,Palliative care",Looking after,Hourly,1500,Accepted
+35,Male,Monaragala,Diploma,Diploma in Caregiving,3,"Sinhala,English",Patient care,Looking after,Full-day,0,Accepted
+42,Male,Kegalle,Degree,NVQ Level 3,5,"Sinhala,English",Disability care,"Looking after,Supervising",Half-day,0,Accepted
+41,Female,Colombo,Short Course,Short caregiving course,3,"Sinhala,English","Disability care,Patient care",Looking after,Full-day,55000,Accepted
+35,Male,Kalutara,Degree,NVQ Level 3,4,"Sinhala,English,Tamil",Palliative care,Supervising,Hourly,0,Accepted
+34,Male,Nuwara Eliya,Diploma,Diploma in Caregiving,5,"English,Tamil","Elderly care,Patient care,Palliative care",All-around,Hourly,1500,Accepted
+37,Male,Gampaha,Diploma,Diploma in Caregiving,2,"Sinhala,English","Elderly care,Disability care",Looking after,Hourly,1000,Accepted
+27,Male,Ratnapura,Short Course,Short caregiving course,0.5,"Sinhala,English",Disability care,Supervising,Half-day,35000,Accepted
+26,Female,Gampaha,Secondary/Diploma,Diploma in Caregiving,0.5,"Sinhala,English",Child care,Looking after,Half-day,35000,Accepted
+54,Male,Monaragala,Diploma,NVQ Level 3,6,Sinhala,"Elderly care,Disability care",All-around,Live-in,45000,Accepted
+31,Male,Vavuniya,Short Course,Short caregiving course,3,"Sinhala,Tamil","Elderly care,Disability care,Domestic support",All-around,Live-in,40000,Accepted
+46,Male,Gampaha,Diploma/Degree,NVQ Level 3,3,"Sinhala,English",Elderly care,Looking after,Half-day,50000,Accepted
+23,Male,Jaffna,Diploma,Diploma in Caregiving,1,"English,Tamil",Domestic support,None,Full-day,25000,Accepted
+45,Female,Kalutara,Diploma/Degree,"First Aid Certificate,Diploma in Caregiving",3,"Sinhala,English","Elderly care,Disability care","Looking after,Supervising",Full-day,60000,Accepted
+24,Male,Hambantota,Diploma,NVQ Level 4,0,"Sinhala,English",Domestic support,Domestic,Hourly,500,Rejected
+55,Male,Nuwara Eliya,Secondary/Short Course,Short caregiving course,8,Sinhala,"Disability care,Domestic support",All-around,Live-in,45000,Accepted
+48,Female,Vavuniya ,Diploma,"NVQ Level 4,Diploma in Caregiving",5,Sinhala,"Palliative care,Domestic support",Supervising,Full-day,50000,Accepted
+34,Male,Kandy,Degree,"NVQ Level 3,Diploma in Caregiving",2,"Sinhala,English",Elderly care,Looking after,Half-day,35000,Accepted
+39,Male,Kalutara,Secondary/Diploma,NVQ Level 3,3,"Sinhala,English",Disability care,Looking after,Live-in,45000,Accepted
+34,Female,Batticaloa,Diploma,"First Aid Certificate,Diploma in Caregiving",2,Sinhala,Child care,Looking after,Half-day,40000,Accepted
+25,Male,Kegalle,Diploma,"First Aid Certificate,Short caregiving course",0,"Sinhala,English","Patient care,Palliative care",Supervising,Hourly,0,Rejected
+22,Male,Kalutara,Secondary/Diploma/Short Course,"NVQ Level 3,Short caregiving course",0,"Sinhala,English",Elderly care,Looking after,Half-day,0,Rejected
