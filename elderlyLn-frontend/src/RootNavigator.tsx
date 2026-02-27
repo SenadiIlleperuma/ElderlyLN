@@ -150,8 +150,7 @@ export type AuthStackParamList = {
   // Admin
   AdminHome: undefined;
   AdminHub: undefined;
-  VerifyCaregiver: VerifyCaregiverPayload;
-};
+VerifyCaregiver: { caregiverId: string };};
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
