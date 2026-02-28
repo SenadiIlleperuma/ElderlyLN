@@ -1,12 +1,11 @@
 const db = require("../db");
 
+// FAMILY/CAREGIVER: FILE COMPLAINT
 async function fileComplaint(userId, bookingId, reason, role) {
-// only family or caregiver can file complaints
   if (!["family", "caregiver"].includes(role)) {
     throw new Error("Forbidden: Only family or caregiver users can file complaints.");
   }
 
-// verify booking ownership
   const bq = `
     SELECT
       b.booking_id,
@@ -34,18 +33,142 @@ async function fileComplaint(userId, bookingId, reason, role) {
     throw new Error("Complaint already filed for this booking.");
   }
 
-  const category = "Other"; 
+  const category = "Other";
   const status = "Submitted";
 
   const iq = `
-    INSERT INTO complaint (booking_fk, filer_fk, description, status, resolution_sla, category)
-    VALUES ($1, $2, $3, $4, NOW() + INTERVAL '24 hours', $5)
+    INSERT INTO complaint (booking_fk, filer_fk, submitted_at, description, status, resolution_sla, category)
+    VALUES ($1, $2, NOW(), $3, $4, NOW() + INTERVAL '24 hours', $5)
     RETURNING complaint_id, booking_fk, filer_fk, submitted_at, description, status, resolution_sla, category
   `;
   const iRes = await db.query(iq, [bookingId, userId, reason, status, category]);
   return iRes.rows[0];
 }
 
+// ADMIN: DASHBOARD STATS
+async function getAdminStats() {
+  const usersQ = `SELECT COUNT(*)::int AS total_users FROM "user" WHERE is_active = true`;
+  const bookingsQ = `SELECT COUNT(*)::int AS total_bookings FROM booking`;
+  const pendingVerifyQ = `
+    SELECT COUNT(*)::int AS pending_reviews
+    FROM caregiver
+    WHERE profile_status IN ('PENDING_VERIFICATION', 'PENDING')
+  `;
+  const urgentComplaintsQ = `
+    SELECT COUNT(*)::int AS urgent_unresolved
+    FROM complaint
+    WHERE status IN ('Submitted', 'Under Review')
+      AND resolution_sla < NOW()
+  `;
+
+  const [u, b, p, ur] = await Promise.all([
+    db.query(usersQ),
+    db.query(bookingsQ),
+    db.query(pendingVerifyQ),
+    db.query(urgentComplaintsQ),
+  ]);
+
+  return {
+    totalUsers: u.rows[0].total_users,
+    totalBookings: b.rows[0].total_bookings,
+    pendingReviews: p.rows[0].pending_reviews,
+    urgentUnresolved: ur.rows[0].urgent_unresolved,
+  };
+}
+
+
+// ADMIN: VERIFICATION QUEUE
+async function getVerificationQueue() {
+  const q = `
+    SELECT
+      c.caregiver_id,
+      c.full_name,
+      COALESCE(d.docs_count, 0) AS docs_count,
+      d.last_uploaded_at AS requested_at
+    FROM caregiver c
+    LEFT JOIN (
+      SELECT
+        caregiver_fk,
+        COUNT(*)::int AS docs_count,
+        MAX(uploaded_at) AS last_uploaded_at
+      FROM caregiver_document
+      GROUP BY caregiver_fk
+    ) d ON d.caregiver_fk = c.caregiver_id
+    WHERE c.profile_status IN ('PENDING_VERIFICATION', 'PENDING')
+    ORDER BY d.last_uploaded_at DESC NULLS LAST, c.caregiver_id DESC
+  `;
+  const r = await db.query(q);
+
+  return r.rows.map((x) => ({
+    id: x.caregiver_id,
+    name: x.full_name,
+    requestedAt: x.requested_at || null,
+    docsCount: x.docs_count,
+  }));
+}
+
+
+// ADMIN: Get caregiver details + uploaded documents for verification page
+async function getCaregiverVerificationDetails(caregiverId) {
+  const cq = `
+    SELECT
+      c.caregiver_id,
+      c.full_name,
+      c.profile_status,
+      c.verification_badges,
+      (
+        SELECT MAX(uploaded_at)
+        FROM caregiver_document d
+        WHERE d.caregiver_fk = c.caregiver_id
+      ) AS requested_at
+    FROM caregiver c
+    WHERE c.caregiver_id = $1
+    LIMIT 1
+  `;
+  const cRes = await db.query(cq, [caregiverId]);
+  if (cRes.rows.length === 0) throw new Error("Caregiver not found.");
+
+  const dq = `
+    SELECT
+      document_id,
+      document_type,
+      file_name,
+      file_url,
+      file_size_kb,
+      mime_type,
+      verification_status,
+      uploaded_at
+    FROM caregiver_document
+    WHERE caregiver_fk = $1
+    ORDER BY uploaded_at DESC
+  `;
+  const dRes = await db.query(dq, [caregiverId]);
+
+  return {
+    caregiver: cRes.rows[0],
+    documents: dRes.rows,
+  };
+}
+
+// ADMIN: APPROVE / REJECT caregiver
+async function updateCaregiverStatus(caregiverId, adminUserId, newStatus, note) {
+  const allowed = ["VERIFIED", "REJECTED", "PENDING_VERIFICATION", "PENDING", "SUSPENDED", "ACTIVE"];
+  if (!allowed.includes(newStatus)) {
+    throw new Error(`Invalid newStatus. Use: ${allowed.join(", ")}`);
+  }
+
+  const q = `
+    UPDATE caregiver
+    SET profile_status = $2
+    WHERE caregiver_id = $1
+    RETURNING caregiver_id, full_name, profile_status
+  `;
+  const r = await db.query(q, [caregiverId, newStatus]);
+  if (!r.rows[0]) throw new Error("Caregiver not found.");
+  return { ...r.rows[0], admin_note: note, updated_by: adminUserId };
+}
+
+// ADMIN: LIST COMPLAINTS
 async function listComplaintsForAdmin() {
   const q = `
     SELECT
@@ -61,7 +184,7 @@ async function listComplaintsForAdmin() {
       c.resolution_note,
 
       u.role AS filer_role,
-      u.full_name AS filer_name,
+      COALESCE(filer_family.full_name, filer_caregiver.full_name) AS filer_name,
 
       b.booking_status,
       b.service_date,
@@ -73,12 +196,17 @@ async function listComplaintsForAdmin() {
     JOIN booking b ON b.booking_id = c.booking_fk
     JOIN family f ON f.family_id = b.family_fk
     JOIN caregiver cg ON cg.caregiver_id = b.caregiver_fk
+
+    LEFT JOIN family filer_family ON filer_family.user_fk = c.filer_fk
+    LEFT JOIN caregiver filer_caregiver ON filer_caregiver.user_fk = c.filer_fk
+
     ORDER BY c.submitted_at DESC
   `;
   const r = await db.query(q);
   return r.rows;
 }
 
+// ADMIN: RESOLVE COMPLAINT
 async function resolveComplaint(complaintId, adminUserId, resolutionNote, newStatus) {
   const allowed = ["Submitted", "Under Review", "Closed"];
   if (!allowed.includes(newStatus)) {
@@ -101,6 +229,10 @@ async function resolveComplaint(complaintId, adminUserId, resolutionNote, newSta
 
 module.exports = {
   fileComplaint,
+  getAdminStats,
+  getVerificationQueue,
+  getCaregiverVerificationDetails,
+  updateCaregiverStatus,
   listComplaintsForAdmin,
   resolveComplaint,
 };

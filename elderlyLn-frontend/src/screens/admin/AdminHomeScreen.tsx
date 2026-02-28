@@ -1,17 +1,42 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { theme } from "../../constants/theme";
-
+import { api } from "../../api/api"; 
 export default function AdminHomeScreen({ navigation }: any) {
   const { t } = useTranslation();
 
-  const totalUsers = 1420;
-  const totalBookings = 842;
-  const pendingReviews = 14;
-  const urgentUnresolved = 1; 
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalBookings: 0,
+    pendingReviews: 0,
+    urgentUnresolved: 0,
+  });
+
+ const fetchStats = async () => {
+  try {
+    setLoading(true);
+    const res = await api.get("/governance/admin/stats");
+    setStats(res.data);
+  } catch (e: any) {
+    console.log("Admin stats error:", e?.response?.data || e?.message);
+    Alert.alert("Error", e?.response?.data?.message || "Failed to load admin stats");
+  } finally {
+    setLoading(false);
+  }
+};
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const totalUsers = stats.totalUsers;
+  const totalBookings = stats.totalBookings;
+  const pendingReviews = stats.pendingReviews;
+  const urgentUnresolved = stats.urgentUnresolved;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -19,10 +44,16 @@ export default function AdminHomeScreen({ navigation }: any) {
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>{t("admin_console")}</Text>
 
-          <Pressable style={styles.iconBtn}>
-            <Ionicons name="notifications-outline" size={22} color={theme.colors.text} />
+          <Pressable style={styles.iconBtn} onPress={fetchStats}>
+            <Ionicons name="refresh-outline" size={22} color={theme.colors.text} />
           </Pressable>
         </View>
+
+        {loading && (
+          <View style={{ paddingVertical: 10 }}>
+            <ActivityIndicator />
+          </View>
+        )}
 
         <View style={styles.cardRow}>
           <View style={[styles.metricCard, styles.metricBlue]}>
@@ -31,7 +62,7 @@ export default function AdminHomeScreen({ navigation }: any) {
 
             <View style={styles.deltaPill}>
               <Ionicons name="trending-up-outline" size={14} color="#fff" />
-              <Text style={styles.deltaText}>+12%</Text>
+              <Text style={styles.deltaText}>LIVE</Text>
             </View>
           </View>
 
@@ -40,8 +71,8 @@ export default function AdminHomeScreen({ navigation }: any) {
             <Text style={[styles.metricValue, { color: "#fff" }]}>{totalBookings.toLocaleString()}</Text>
 
             <View style={[styles.deltaPill, { backgroundColor: "rgba(34,197,94,0.25)" }]}>
-              <Ionicons name="trending-up-outline" size={14} color="#22c55e" />
-              <Text style={[styles.deltaText, { color: "#22c55e" }]}>+8%</Text>
+              <Ionicons name="pulse-outline" size={14} color="#22c55e" />
+              <Text style={[styles.deltaText, { color: "#22c55e" }]}>LIVE</Text>
             </View>
           </View>
         </View>

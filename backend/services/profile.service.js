@@ -1,3 +1,4 @@
+// services/profile.service.js
 const db = require("../db");
 
 async function getFamilyByUserId(userId) {
@@ -23,6 +24,8 @@ async function getCaregiverByUserId(userId) {
       c.experience_years, c.languages_spoken, c.care_category,
       c.service_type, c.availability_period, c.expected_rate,
       c.profile_image_url,
+      c.profile_status,
+      c.verification_badges,
       u.email, u.phone_no, u.is_active, u.deactivated_at
     FROM caregiver c
     JOIN "user" u ON u.user_id = c.user_fk
@@ -31,6 +34,9 @@ async function getCaregiverByUserId(userId) {
   `;
   const r = await db.query(q, [userId]);
   if (!r.rows[0]) throw new Error("Caregiver profile not found.");
+
+  console.log("[DB getCaregiverByUserId] userId:", userId, "caregiver_id:", r.rows[0].caregiver_id, "status:", r.rows[0].profile_status);
+
   return r.rows[0];
 }
 
@@ -139,6 +145,112 @@ async function updateMyCaregiverProfile(userId, payload) {
   return await getCaregiverByUserId(userId);
 }
 
+// CAREGIVER VERIFICATION HELPERS
+async function getCaregiverIdByUserId(userId) {
+  const q = `SELECT caregiver_id FROM caregiver WHERE user_fk = $1 LIMIT 1`;
+  const r = await db.query(q, [userId]);
+  if (!r.rows[0]) throw new Error("Caregiver profile not found.");
+  return r.rows[0].caregiver_id;
+}
+
+async function getMyCaregiverVerificationStatus(userId) {
+  const q = `
+    SELECT caregiver_id, profile_status, verification_badges
+    FROM caregiver
+    WHERE user_fk = $1
+    LIMIT 1
+  `;
+  const r = await db.query(q, [userId]);
+  if (!r.rows[0]) throw new Error("Caregiver profile not found.");
+  return r.rows[0];
+}
+
+async function listMyCaregiverDocuments(userId) {
+  const caregiverId = await getCaregiverIdByUserId(userId);
+
+  const q = `
+    SELECT
+      document_id,
+      caregiver_fk,
+      document_type,
+      file_url,
+      file_name,
+      file_size_kb,
+      mime_type,
+      verification_status,
+      uploaded_at
+    FROM caregiver_document
+    WHERE caregiver_fk = $1
+    ORDER BY uploaded_at DESC
+  `;
+  const r = await db.query(q, [caregiverId]);
+  return r.rows;
+}
+
+async function addMyCaregiverDocument(userId, doc) {
+  const caregiverId = await getCaregiverIdByUserId(userId);
+
+  const {
+    document_type,
+    file_url,
+    file_name,
+    file_size_kb,
+    mime_type,
+  } = doc;
+
+  const allowedTypes = ["NIC", "POLICE", "CERTIFICATE"];
+  if (!allowedTypes.includes(document_type)) {
+    throw new Error(`Invalid document_type. Use: ${allowedTypes.join(", ")}`);
+  }
+
+  const verification_status = "PENDING";
+
+  const q = `
+    INSERT INTO caregiver_document
+      (caregiver_fk, document_type, file_url, file_name, file_size_kb, mime_type, verification_status, uploaded_at)
+    VALUES
+      ($1, $2, $3, $4, $5, $6, $7, NOW())
+    RETURNING
+      document_id, caregiver_fk, document_type, file_url, file_name, file_size_kb, mime_type, verification_status, uploaded_at
+  `;
+  const r = await db.query(q, [
+    caregiverId,
+    document_type,
+    file_url,
+    file_name,
+    file_size_kb,
+    mime_type,
+    verification_status,
+  ]);
+
+  return r.rows[0];
+}
+
+async function submitMyCaregiverForVerification(userId) {
+  const caregiverId = await getCaregiverIdByUserId(userId);
+
+  const q = `
+    SELECT document_type
+    FROM caregiver_document
+    WHERE caregiver_fk = $1
+  `;
+  const r = await db.query(q, [caregiverId]);
+  const types = r.rows.map((x) => x.document_type);
+
+  if (!types.includes("NIC") || !types.includes("POLICE")) {
+    throw new Error("Please upload NIC and Police Clearance before submitting for verification.");
+  }
+
+  const upd = `
+    UPDATE caregiver
+    SET profile_status = 'PENDING_VERIFICATION'
+    WHERE caregiver_id = $1
+    RETURNING caregiver_id, profile_status
+  `;
+  const u = await db.query(upd, [caregiverId]);
+  return u.rows[0];
+}
+
 async function deactivateMyAccount(userId) {
   const q = `
     UPDATE "user"
@@ -175,6 +287,12 @@ module.exports = {
   updateMyFamilyProfile,
   getMyCaregiverProfile,
   updateMyCaregiverProfile,
+
+  getMyCaregiverVerificationStatus,
+  listMyCaregiverDocuments,
+  addMyCaregiverDocument,
+  submitMyCaregiverForVerification,
+
   deactivateMyAccount,
   reactivateMyAccount,
   deleteMyAccountPermanently,

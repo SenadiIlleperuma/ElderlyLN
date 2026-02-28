@@ -1,72 +1,172 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable, FlatList, Modal, TextInput, Alert } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {View,Text,StyleSheet,Pressable, FlatList,Modal, TextInput, Alert, ActivityIndicator,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
 import { AuthStackParamList } from "../../RootNavigator";
 import { theme } from "../../constants/theme";
-
+import { api } from "../../api/api"; 
 type Props = NativeStackScreenProps<AuthStackParamList, "AdminHub">;
 
 type QueueItem = {
-  id: string;
-  name: string;
-  timeAgo: string;
+  id: string; 
+  name: string; 
+  requestedAt: string | null;
   docsCount: number;
 };
 
 type ComplaintItem = {
-  id: string;
-  status: "PENDING" | "RESOLVED";
-  date: string;
-  familyName: string;
-  summary: string;
+  complaint_id: string;
+  status: "Submitted" | "Under Review" | "Closed" | string;
+  submitted_at: string;
+  description: string;
+  family_name?: string;
+  caregiver_name?: string;
 };
-
-const QUEUE: QueueItem[] = [
-  { id: "q1", name: "Hasini Perera", timeAgo: "2 HOURS AGO", docsCount: 3 },
-  { id: "q2", name: "Malith Silva", timeAgo: "5 HOURS AGO", docsCount: 2 },
-  { id: "q3", name: "Sunil Rajapaksha", timeAgo: "1 DAY AGO", docsCount: 4 },
-];
-
-const COMPLAINTS: ComplaintItem[] = [
-  { id: "c1", status: "PENDING", date: "2024-05-18", familyName: "The Fonseka Family", summary: "Punctuality issues during morning shift" },
-];
 
 export default function AdminHubScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<"verification" | "complaints">("verification");
 
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [complaints, setComplaints] = useState<ComplaintItem[]>([]);
+  const [loadingQueue, setLoadingQueue] = useState(false);
+  const [loadingComplaints, setLoadingComplaints] = useState(false);
+
   const [showDispute, setShowDispute] = useState(false);
   const [note, setNote] = useState("");
+  const [selectedComplaint, setSelectedComplaint] = useState<ComplaintItem | null>(null);
 
-  const openVerify = (name: string) => {
-    navigation.navigate("VerifyCaregiver", {
-      caregiver: {
-        id: "cg_" + name.toLowerCase().replace(/\s+/g, "_"),
-        name,
-        appliedDateLabel: t("applied_on_date"),
-        nicStatus: "AUTO_PASS",
-        policeStatus: "MANUAL_REVIEW",
-        docs: [
-          { id: "d1", filename: "Nursing_Certificate.pdf", sizeLabel: "2.4 MB", type: "pdf" },
-          { id: "d2", filename: "Police_Clearance.jpg", sizeLabel: "1.1 MB", type: "jpg" },
-          { id: "d3", filename: "Reference_Letter.pdf", sizeLabel: "840 KB", type: "pdf" },
-        ],
-      },
-    });
+  const complaintsCount = complaints.length;
+
+  const fetchQueue = async () => {
+    try {
+      setLoadingQueue(true);
+      const res = await api.get("/governance/admin/verificationQueue");
+      setQueue(res.data || []);
+    } catch (e: any) {
+      console.log("Queue error:", e?.response?.data || e?.message);
+      Alert.alert("Error", e?.response?.data?.message || "Failed to load verification queue");
+    } finally {
+      setLoadingQueue(false);
+    }
   };
 
-  const resolve = () => {
-    setShowDispute(false);
-    Alert.alert(t("marked_resolved_demo"), note ? `${t("internal_note")}: ${note}` : t("no_note"));
-    setNote("");
+  const fetchComplaints = async () => {
+    try {
+      setLoadingComplaints(true);
+      const res = await api.get("/governance/complaints");
+      setComplaints(res.data || []);
+    } catch (e: any) {
+      console.log("Complaints error:", e?.response?.data || e?.message);
+      Alert.alert("Error", e?.response?.data?.message || "Failed to load complaints");
+    } finally {
+      setLoadingComplaints(false);
+    }
   };
+
+  useEffect(() => {
+    fetchQueue();
+    fetchComplaints();
+  }, []);
+
+  const openVerify = (caregiverId: string) => {
+    navigation.navigate("VerifyCaregiver", { caregiverId });
+  };
+
+  const openResolveModal = (c: ComplaintItem) => {
+    setSelectedComplaint(c);
+    setShowDispute(true);
+  };
+
+  const resolve = async () => {
+    try {
+      if (!selectedComplaint) return;
+
+      if (!note.trim()) {
+        Alert.alert("Note required", "Please add a short resolution note.");
+        return;
+      }
+
+      await api.put(`/governance/resolveComplaint/${selectedComplaint.complaint_id}`, {
+        resolutionNote: note.trim(),
+        newStatus: "Closed",
+      });
+
+      setShowDispute(false);
+      setNote("");
+      setSelectedComplaint(null);
+      fetchComplaints();
+      Alert.alert(t("marked_resolved_demo"));
+    } catch (e: any) {
+      console.log("Resolve error:", e?.response?.data || e?.message);
+      Alert.alert("Error", e?.response?.data?.message || "Failed to resolve complaint");
+    }
+  };
+
+  const renderQueueItem = ({ item, index }: { item: QueueItem; index: number }) => {
+    const active = index === 0;
+    return (
+      <Pressable onPress={() => openVerify(item.id)} style={[styles.queueCard, active && styles.queueActive]}>
+        <View style={styles.circle}>
+          <Text style={styles.circleText}>{(item.name?.[0] || "?").toUpperCase()}</Text>
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <Text style={styles.queueName}>{item.name}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 6 }}>
+            <Text style={styles.queueMeta}>{item.requestedAt ? "PENDING" : "PENDING"}</Text>
+            <Text style={styles.queueDot}>•</Text>
+            <Text style={styles.queueDocs}>
+              {item.docsCount} {t("docs")}
+            </Text>
+          </View>
+        </View>
+
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+      </Pressable>
+    );
+  };
+
+  const renderComplaintItem = ({ item }: { item: ComplaintItem }) => {
+    const isPending = item.status !== "Closed";
+    return (
+      <Pressable onPress={() => openResolveModal(item)} style={styles.complaintCard}>
+        <View style={[styles.pendingPill, !isPending && { backgroundColor: "#DCFCE7" }]}>
+          <Text style={[styles.pendingText, !isPending && { color: "#166534" }]}>
+            {isPending ? t("pending") : t("resolved")}
+          </Text>
+        </View>
+
+        <Text style={styles.complaintDate}>{String(item.submitted_at).slice(0, 10)}</Text>
+
+        <Text style={styles.family}>
+          {item.family_name ? item.family_name : "Family"} {item.caregiver_name ? `→ ${item.caregiver_name}` : ""}
+        </Text>
+        <Text style={styles.summary} numberOfLines={2}>
+          "{item.description}"
+        </Text>
+      </Pressable>
+    );
+  };
+
+  const headerRight = useMemo(() => {
+    return (
+      <Pressable
+        style={styles.iconBtn}
+        onPress={() => {
+          fetchQueue();
+          fetchComplaints();
+        }}
+      >
+        <Ionicons name="refresh-outline" size={22} color={theme.colors.text} />
+      </Pressable>
+    );
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
-
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
@@ -74,109 +174,118 @@ export default function AdminHubScreen({ navigation }: Props) {
 
         <Text style={styles.headerTitle}>{t("admin_hub")}</Text>
 
-        <Pressable style={styles.iconBtn}>
-          <Ionicons name="notifications-outline" size={22} color={theme.colors.text} />
-          <View style={styles.dot} />
-        </Pressable>
+        {headerRight}
       </View>
 
       <View style={styles.segmentWrap}>
         <Pressable onPress={() => setTab("verification")} style={[styles.segmentBtn, tab === "verification" && styles.segmentActive]}>
           <Text style={[styles.segmentText, tab === "verification" && styles.segmentTextActive]}>{t("verification_queue")}</Text>
         </Pressable>
+
         <Pressable onPress={() => setTab("complaints")} style={[styles.segmentBtn, tab === "complaints" && styles.segmentActive]}>
           <Text style={[styles.segmentText, tab === "complaints" && styles.segmentTextActive]}>
-            {t("complaints")} ({COMPLAINTS.length})
+            {t("complaints")} ({complaintsCount})
           </Text>
         </Pressable>
       </View>
 
       {tab === "verification" ? (
+        loadingQueue ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator />
+          </View>
+        ) : (
+          <FlatList
+            contentContainerStyle={{ padding: theme.spacing.xl, paddingBottom: 24 }}
+            data={queue}
+            keyExtractor={(x) => x.id}
+            renderItem={renderQueueItem}
+            ListEmptyComponent={
+              <View style={{ paddingTop: 30, alignItems: "center" }}>
+                <Text style={{ color: theme.colors.muted, fontWeight: "800" }}>No pending verification requests</Text>
+              </View>
+            }
+          />
+        )
+      ) : loadingComplaints ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator />
+        </View>
+      ) : (
         <FlatList
           contentContainerStyle={{ padding: theme.spacing.xl, paddingBottom: 24 }}
-          data={QUEUE}
-          keyExtractor={(x) => x.id}
-          renderItem={({ item, index }) => {
-            const active = index === 0;
-            return (
-              <Pressable onPress={() => openVerify(item.name)} style={[styles.queueCard, active && styles.queueActive]}>
-                <View style={styles.circle}>
-                  <Text style={styles.circleText}>{item.name[0]}</Text>
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.queueName}>{item.name}</Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 6 }}>
-                    <Text style={styles.queueMeta}>{item.timeAgo}</Text>
-                    <Text style={styles.queueDot}>•</Text>
-                    <Text style={styles.queueDocs}>{item.docsCount} {t("docs")}</Text>
-                  </View>
-                </View>
-
-                <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
-              </Pressable>
-            );
-          }}
+          data={complaints}
+          keyExtractor={(x) => x.complaint_id}
+          renderItem={renderComplaintItem}
+          ListEmptyComponent={
+            <View style={{ paddingTop: 30, alignItems: "center" }}>
+              <Text style={{ color: theme.colors.muted, fontWeight: "800" }}>No complaints yet</Text>
+            </View>
+          }
         />
-      ) : (
-        <View style={{ padding: theme.spacing.xl }}>
-          <Pressable onPress={() => setShowDispute(true)} style={styles.complaintCard}>
-            <View style={styles.pendingPill}>
-              <Text style={styles.pendingText}>{t("pending")}</Text>
-            </View>
-            <Text style={styles.complaintDate}>{COMPLAINTS[0].date}</Text>
-
-            <Text style={styles.family}>{COMPLAINTS[0].familyName}</Text>
-            <Text style={styles.summary}>"{COMPLAINTS[0].summary}"</Text>
-          </Pressable>
-
-          <Modal visible={showDispute} transparent animationType="fade" onRequestClose={() => setShowDispute(false)}>
-            <View style={styles.modalBackdrop}>
-              <View style={styles.modalCard}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{t("dispute_resolution")}</Text>
-                  <Pressable onPress={() => setShowDispute(false)} style={styles.modalClose}>
-                    <Ionicons name="close" size={20} color={theme.colors.text} />
-                  </Pressable>
-                </View>
-
-                <View style={styles.summaryBox}>
-                  <Text style={styles.summaryLabel}>{t("complaint_summary")}</Text>
-                  <Text style={styles.summaryText}>"{COMPLAINTS[0].summary}"</Text>
-                </View>
-
-                <TextInput
-                  value={note}
-                  onChangeText={setNote}
-                  placeholder={t("add_internal_note")}
-                  placeholderTextColor="#9aa3af"
-                  multiline
-                  style={styles.input}
-                />
-
-                <View style={styles.actions}>
-                  <Pressable onPress={() => setShowDispute(false)} style={styles.closeBtn}>
-                    <Text style={styles.closeText}>{t("close")}</Text>
-                  </Pressable>
-
-                  <Pressable onPress={resolve} style={styles.resolveBtn}>
-                    <Text style={styles.resolveText}>{t("mark_resolved")}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          </Modal>
-        </View>
       )}
+
+      <Modal visible={showDispute} transparent animationType="fade" onRequestClose={() => setShowDispute(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t("dispute_resolution")}</Text>
+              <Pressable
+                onPress={() => {
+                  setShowDispute(false);
+                  setSelectedComplaint(null);
+                  setNote("");
+                }}
+                style={styles.modalClose}
+              >
+                <Ionicons name="close" size={20} color={theme.colors.text} />
+              </Pressable>
+            </View>
+
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryLabel}>{t("complaint_summary")}</Text>
+              <Text style={styles.summaryText} numberOfLines={4}>
+                "{selectedComplaint?.description || "-"}"
+              </Text>
+              <Text style={{ marginTop: 8, fontWeight: "800", color: theme.colors.muted }}>
+                Status: {selectedComplaint?.status || "-"}
+              </Text>
+            </View>
+
+            <TextInput
+              value={note}
+              onChangeText={setNote}
+              placeholder={t("add_internal_note")}
+              placeholderTextColor="#9aa3af"
+              multiline
+              style={styles.input}
+            />
+
+            <View style={styles.actions}>
+              <Pressable
+                onPress={() => {
+                  setShowDispute(false);
+                  setSelectedComplaint(null);
+                  setNote("");
+                }}
+                style={styles.closeBtn}
+              >
+                <Text style={styles.closeText}>{t("close")}</Text>
+              </Pressable>
+
+              <Pressable onPress={resolve} style={styles.resolveBtn}>
+                <Text style={styles.resolveText}>{t("mark_resolved")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { 
-    flex: 1, 
-    backgroundColor: theme.colors.bg 
-  },
+  safe: { flex: 1, backgroundColor: theme.colors.bg },
   header: {
     height: 56,
     flexDirection: "row",
@@ -185,28 +294,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  iconBtn: { 
-    width: 44, 
-    height: 44, 
-    alignItems: "center", 
-    justifyContent: "center" 
-  },
-  headerTitle: { 
-    flex: 1, 
-    textAlign: "center", 
-    fontSize: 18, 
-    fontWeight: "900", 
-    color: theme.colors.text 
-  },
-  dot: { 
-    position: "absolute", 
-    top: 11, 
-    right: 12, 
-    width: 7, 
-    height: 7, 
-    borderRadius: 99, 
-    backgroundColor: "#EF4444" 
-  },
+  iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  headerTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "900", color: theme.colors.text },
 
   segmentWrap: {
     marginTop: 14,
@@ -217,22 +306,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
   },
-  segmentBtn: { 
-    flex: 1, 
-    paddingVertical: 12, 
-    borderRadius: 14, 
-    alignItems: "center" 
-  },
-  segmentActive: { 
-    backgroundColor: "#fff" 
-  },
-  segmentText: { 
-    fontWeight: "900", 
-    color: theme.colors.muted 
-  },
-  segmentTextActive: { 
-    color: theme.colors.text 
-  },
+  segmentBtn: { flex: 1, paddingVertical: 12, borderRadius: 14, alignItems: "center" },
+  segmentActive: { backgroundColor: "#fff" },
+  segmentText: { fontWeight: "900", color: theme.colors.muted },
+  segmentTextActive: { color: theme.colors.text },
 
   queueCard: {
     backgroundColor: "#fff",
@@ -245,38 +322,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  queueActive: { 
-    borderColor: "#2E6BFF", 
-    borderWidth: 2 
-  },
-
-  circle: { 
-    width: 44, 
-    height: 44, 
-    borderRadius: 99, 
-    backgroundColor: "#F3F4F6", 
-    alignItems: "center", 
-    justifyContent: "center" 
+  queueActive: { borderColor: "#2E6BFF", borderWidth: 2 },
+  circle: {
+    width: 44,
+    height: 44,
+    borderRadius: 99,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   circleText: { 
     fontWeight: "900", 
-    color: theme.colors.muted
-   },
+    color: theme.colors.muted 
+  },
 
   queueName: { 
     fontWeight: "900", 
     fontSize: 16, 
     color: theme.colors.text 
   },
-  queueMeta: { 
-    fontWeight: "800", 
-    color: theme.colors.muted, 
-    fontSize: 12 
-  },
+  queueMeta: {
+     fontWeight: "800", 
+     color: theme.colors.muted, 
+     fontSize: 12 
+    },
   queueDot: { 
     color: theme.colors.muted, 
-    fontWeight: "900" 
-  },
+    fontWeight: "900"
+   },
   queueDocs: { 
     color: "#2E6BFF", 
     fontWeight: "900", 
@@ -288,7 +361,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: "#FECACA", 
     borderRadius: 18, 
-    padding: 16 
+    padding: 16, 
+    marginBottom: 12 
   },
   pendingPill: { 
     alignSelf: "flex-start", 
@@ -329,10 +403,10 @@ const styles = StyleSheet.create({
   },
   modalCard: { 
     width: "100%", 
-    backgroundColor: "#fff", 
-    borderRadius: 20, 
-    padding: 16 
-  },
+    backgroundColor: "#fff",
+     borderRadius: 20,
+      padding: 16 
+    },
   modalHeader: { 
     flexDirection: "row", 
     alignItems: "center", 
@@ -376,11 +450,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: theme.colors.border, 
     borderRadius: 16, 
-    padding: 12, 
-    minHeight: 96, 
-    fontWeight: "700", 
-    color: theme.colors.text 
-  },
+    padding: 12,
+     minHeight: 96, 
+     fontWeight: "700", 
+     color: theme.colors.text 
+    },
 
   actions: { 
     flexDirection: "row", 
@@ -393,8 +467,8 @@ const styles = StyleSheet.create({
     borderRadius: 16, 
     backgroundColor: "#F3F4F6", 
     alignItems: "center", 
-    justifyContent: "center" 
-  },
+    justifyContent: "center"
+   },
   closeText: { 
     fontWeight: "900", 
     color: theme.colors.muted 
