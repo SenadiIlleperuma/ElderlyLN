@@ -1,177 +1,119 @@
-
-# ElderlyLN – AI-Powered Caregiver Management & Matching System
-
-An AI - driven caregiver management and matching platform designed to improve trust, transparency, and accessibility in elderly care services in Sri Lanka.
-
-The system enables families to find verified caregivers using an intelligent ML-based matching algorithm, while allowing administrators to manage verification and complaints efficiently.
+# 🧓 ElderlyLN – AI-Powered Caregiver Management & Matching System
 
 ---
 
 ## 📌 Project Overview
 
-ElderlyLN is a trilingual (Sinhala / Tamil / English) mobile-based caregiver platform that:
+ElderlyLN is an AI-driven caregiver management and matching platform designed to improve **trust, transparency, and accessibility** in elderly care services in Sri Lanka.
 
-- Matches families with suitable caregivers using machine learning.
-- Allows caregivers to upload verification documents (NIC, Police Clearance, Certificates).
-- Enables administrators to review and approve caregivers.
-- Manages bookings, complaints, and reviews.
+The system enables:
 
-The system addresses issues such as:
+- Families to find verified caregivers using an intelligent ML-based matching algorithm  
+- Caregivers to upload verification documents and manage bookings  
+- Administrators to review, verify, and manage complaints efficiently  
 
-- Lack of caregiver trust verification
-- Language barriers
-- Poor transparency in traditional caregiver hiring processes
+The platform is fully trilingual: **Sinhala | Tamil | English**
 
 ---
 
 ## 🔎 Key Features
 
 ### 👩‍⚕️ Caregiver Module
-- Profile creation & editing
-- Document upload (NIC / Police Clearance / Certificates)
-- Submit for verification
-- Booking management
-- Review visibility
+- Profile creation & editing  
+- Verification document upload (NIC / Police Clearance / Certificates)  
+- Submit profile for verification  
+- Booking request management  
+- Review visibility  
 
 ### 👨‍👩‍👧 Family Module
-- Search caregivers
-- AI-based matching system
-- Booking requests
-- Review & rating system
-- Complaint submission
+- Caregiver search & filtering  
+- AI-based smart matching system  
+- Booking requests  
+- Review & rating system  
+- Complaint submission  
 
 ### 👨‍💼 Admin Module
-- Dashboard statistics
-- Verification queue
-- Caregiver document review
-- Complaint resolution system
-- Status management (Pending / Verified / Rejected)
+- Dashboard statistics  
+- Verification queue management  
+- Caregiver document review  
+- Complaint resolution system  
+- Status control (Pending / Verified / Rejected)  
 
 ---
 
 ## 🧰 Tech Stack
 
-### Backend
-- Node.js
-- Express.js
-- PostgreSQL
-- JWT Authentication
-- Multer (Document Upload)
+#### 🚀 Backend
+- Node.js  
+- Express.js  
+- PostgreSQL  
+- JWT Authentication  
+- Multer (File Upload Handling)  
 
-### Frontend
-- React Native (Expo)
-- i18n (Sinhala / Tamil / English)
-- Axios (API communication)
+#### 📱 Frontend
+- React Native (Expo)  
+- i18n (Sinhala / Tamil / English)  
+- Axios (API Communication)  
 
-### Machine Learning
-- Python
-- Random Forest Classifier
-- Scikit-learn
-- Joblib (Model persistence)
-- Performance Metrics: Accuracy, Precision, Recall, F1-score
-
----
-
-## 🧠 How AI Matching Works
-
-1. Family enters care requirements  
-2. Backend retrieves available caregivers  
-3. Python ML model predicts suitability score  
-4. System ranks caregivers  
-5. Top matches are returned to the user  
+#### 🤖 Machine Learning
+- Python  
+- Random Forest Classifier  
+- Scikit-learn  
+- Joblib (Model persistence)  
+- Performance Metrics: Accuracy, Precision, Recall, F1-Score  
 
 ---
 
-## 📂 Project Structure
-ElderlyLN/
-│
-├── backend/
-│ ├── routes/
-│ ├── services/
-│ ├── utils/
-│ ├── uploads/
-│ ├── ml/
-│ ├── db.js
-│ ├── server.js
-│ └── .env
-│
-├── elderlyLn-frontend/
-│ ├── screens/
-│ ├── i18n/
-│ └── api/
-│
-└── README.md
+### 🧠 How AI Matching Works
 
-
----
----
-
-# ⚙️ How to Run the Project
-
-This project has two main parts:
-
-1. Backend (Server)
-2. Frontend (Mobile App)
-
-Both must be running at the same time.
+1️⃣ Family enters care requirements  
+2️⃣ Backend retrieves available caregivers  
+3️⃣ Python ML model calculates suitability score  
+4️⃣ Caregivers are ranked  
+5️⃣ Top matches are returned to the user  
 
 ---
 
-## 🟢 Step 1 – Start the Backend (Server)
+## ⚙️ Local Setup Guide
 
-The backend is the part that connects to the database and handles all logic.
+---
 
-### 1️⃣ Open a terminal
+### 🟢 Backend Setup
 
-- On Mac: Open **Terminal**
-- On Windows: Open **Command Prompt** or **PowerShell**
+#### 1️⃣ Open Terminal / Command Prompt
 
-### 2️⃣ Go inside the backend folder
-
-Type:
+#### 2️⃣ Navigate to backend folder
 
 ```
 cd backend
 ```
 
-Press Enter.
-
-### 3️⃣ Install required packages
-
-Type:
+#### 3️⃣ Install dependencies
 
 ```
 npm install
 ```
 
-Wait until it finishes.
-
-### 4️⃣ Start the server
-
-Type:
+#### 4️⃣ Start backend server
 
 ```
 npm start
 ```
 
-If successful, you will see something like:
+If successful, you should see:
 
 ```
 ElderlyLN Backend running on port 5001
 Database Connection Connected successfully
 ```
 
-That means the backend is working.
-
 ---
 
-## 🤖 Step 2 – Setup Machine Learning (Only First Time)
+### 🤖 Machine Learning Setup (Required Once)
 
-This is needed for the AI matching feature.
+Inside backend folder:
 
-Still inside the backend folder:
-
-### Create virtual environment
+#### Create virtual environment
 
 Mac:
 ```
@@ -183,7 +125,7 @@ Windows:
 python -m venv .venv
 ```
 
-### Activate it
+#### Activate environment
 
 Mac:
 ```
@@ -195,50 +137,44 @@ Windows:
 .venv\Scripts\activate
 ```
 
-### Install ML libraries
+#### Install ML libraries
 
 ```
 pip install joblib pandas numpy scikit-learn scipy
 ```
 
-You only need to do this once.
-
 ---
 
-## 📱 Step 3 – Start the Frontend (Mobile App)
+### 📱 Frontend Setup
 
-Open a **new terminal window** (keep backend running).
+Open a new terminal.
 
-### 1️⃣ Go to frontend folder
+#### 1️⃣ Navigate to frontend folder
 
 ```
 cd elderlyLn-frontend
 ```
 
-### 2️⃣ Install dependencies
+#### 2️⃣ Install dependencies
 
 ```
 npm install
 ```
 
-### 3️⃣ Start Expo
+#### 3️⃣ Start Expo
 
 ```
 npx expo start
 ```
 
-Expo will open in your browser.
-
-You can then:
-- Press **a** for Android emulator
-- Press **i** for iPhone simulator
-- Or scan QR code using Expo Go app
+You can:
+- Press **a** → Android emulator  
+- Press **i** → iOS simulator  
+- Scan QR using Expo Go  
 
 ---
 
-## 🔗 Important – API Configuration
-
-Inside the frontend, make sure the API URL is correct.
+### 🔗 API Configuration
 
 For Android Emulator:
 
@@ -246,26 +182,16 @@ For Android Emulator:
 http://10.0.2.2:5001
 ```
 
-For real phone (same WiFi):
+For real device (same WiFi):
 
 ```
-http://[YOUR_COMPUTER_IP]:5001
+http://[YOUR_LOCAL_IP]:5001
 ```
 
 ---
 
-## 🚀 Running the Full System
-
-You must run:
-
-- Backend (Terminal 1)
-- Frontend (Terminal 2)
-
-Both must stay running while testing.
-
----
-
-## 👨‍💻 Developed As
+### 🎓 Developed As
 
 Final Year Research Project  
-AI-Powered Caregiver Management & Matching System
+AI-Powered Caregiver Management & Matching System  
+Built for improving elderly care trust in Sri Lanka 🇱🇰
