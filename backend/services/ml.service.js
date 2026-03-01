@@ -2,7 +2,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 const db = require("../db");
 
-const ML_MODEL_PATH = path.join(__dirname, "../../elderlyLn-ml/caregiver_matcher.pkl");
+const ML_MODEL_PATH = path.join(__dirname, "../../elderlyLn-ml/caregiver_matcher_01.pkl");
 const PYTHON_SCRIPT_PATH = path.join(__dirname, "../ml/predict.py");
 
 const SERVICE_TYPE_MAP = {

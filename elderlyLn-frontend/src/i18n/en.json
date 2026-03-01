@@ -319,13 +319,50 @@
   "go_to_hub": "GO TO HUB",
   "unresolved_count": "{{count}} unresolved complaints.",
 
- "admin_hub": "Admin Hub"
+ "admin_hub": "Admin Hub",
+
+
+ 
+  
+
+  "spec_full_time": "Full-time",
+  "spec_part_time": "Part-time",
+  "spec_nursing_care": "Nursing care",
+  "spec_companionship": "Companionship",
+  "spec_special_needs": "Special needs",
+
+  "lang_si": "Sinhala",
+  "lang_ta": "Tamil",
+  "lang_en": "English",
+  
+  "alerts": "Alerts",
+  "all": "All",
+  "unread": "Unread",
+
+  "no_alerts": "No alerts",
+  "no_alerts_sub": "You're all caught up. New updates will appear here.",
+
+  "view_requests": "View requests",
+
+  "alert_new_request": "New booking request",
+  "alert_new_request_body": "A family has sent you a new booking request. Please review and respond.",
+
+  "alert_shift_reminder": "Shift reminder",
+  "alert_shift_reminder_body": "You have an upcoming shift soon. Please check your schedule.",
+
+  "alert_payment_processed": "Payment processed",
+  "alert_payment_processed_body": "Your payment has been processed successfully.",
+
+  "alert_profile_tip": "Profile tip",
+  "alert_profile_tip_body": "Complete your profile details to get more booking requests.",
+
+  "alert_time_now": "Now",
+  "alert_time_1h": "1h ago",
+  "alert_time_yesterday": "Yesterday",
+  "alert_time_2d": "2 days ago"
+
+
+
 
 
  }
-
-
-
-
-
-

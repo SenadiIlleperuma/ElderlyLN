@@ -1,13 +1,11 @@
 const express = require("express");
 const router = express.Router();
-
 const bookingService = require("../services/booking.service");
 const { authenticateToken } = require("../middleware/auth.middleware");
 
 router.use(authenticateToken);
 
 //POST /api/booking/create
- 
 router.post("/create", async (req, res) => {
   try {
     const { caregiverId, serviceDate, notes } = req.body;
@@ -23,14 +21,12 @@ router.post("/create", async (req, res) => {
         message: "Missing required fields: caregiverId and serviceDate are required.",
       });
     }
-
     const booking = await bookingService.createBooking(
       req.user.user_id,
       caregiverId,
       serviceDate,
       notes
     );
-
     res.status(201).json({
       message: "Booking request sent successfully.",
       booking,
