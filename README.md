@@ -1,4 +1,4 @@
-# 🧓 ElderlyLN – AI-Powered Caregiver Management & Matching System
+# 🧓 ElderlyLN - AI-Powered Caregiver Management & Matching System
 
 ---
 
