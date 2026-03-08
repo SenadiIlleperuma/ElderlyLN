@@ -258,7 +258,7 @@
   "could_not_update_status": "Could not update status.",
   "confirm_request_action_title": "{{status}} request?",
   "no_upcoming_shifts": "No upcoming shifts",
-"no_upcoming_shifts_sub": "Accepted bookings will appear here.",
+  "no_upcoming_shifts_sub": "Accepted bookings will appear here.",
 
   "error": "Error",
   "failed_load_bookings": "Failed to load bookings.",
@@ -308,7 +308,7 @@
   "write_brief_review": "Write a brief review...",
   "later": "Later",
   "submit_review": "Submit Review",
- "rate_review": "Rate & Review",
+  "rate_review": "Rate & Review",
  
 
   "management_center": "Management Center",
@@ -319,11 +319,7 @@
   "go_to_hub": "GO TO HUB",
   "unresolved_count": "{{count}} unresolved complaints.",
 
- "admin_hub": "Admin Hub",
-
-
- 
-  
+  "admin_hub": "Admin Hub",
 
   "spec_full_time": "Full-time",
   "spec_part_time": "Part-time",
@@ -360,9 +356,5 @@
   "alert_time_1h": "1h ago",
   "alert_time_yesterday": "Yesterday",
   "alert_time_2d": "2 days ago"
-
-
-
-
 
  }
