@@ -1,5 +1,14 @@
 import React, { useCallback, useState } from "react";
-import { View,Text, StyleSheet, Pressable,ScrollView,ActivityIndicator, RefreshControl, Modal,} from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+  Modal,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -200,11 +209,13 @@ export default function FamilyHomeScreen({ navigation }: Props) {
             <Text style={{ fontSize: 22 }}>🏠</Text>
           </View>
 
-          <View style={{ flex: 1 }}>
+          <View style={styles.greetTextWrap}>
             <Text style={styles.greetTitle}>
-              {t("hello_name", { name: fullName?.trim() ? fullName : (t("guest") || "Guest") })}
+              {t("hello_name", { name: fullName?.trim() ? fullName : t("guest") || "Guest" })}
             </Text>
-            <Text style={styles.greetSub}>{t("welcome_portal") || "Welcome to your family care portal."}</Text>
+            <Text style={styles.greetSub}>
+              {t("welcome_portal") || "Welcome to your family care portal."}
+            </Text>
           </View>
 
           <Pressable onPress={() => navigation.navigate("EditProfile")} style={styles.profileBtn}>
@@ -214,7 +225,9 @@ export default function FamilyHomeScreen({ navigation }: Props) {
 
         <View style={styles.bigCard}>
           <Text style={styles.bigTitle}>{t("find_support") || "Find support"}</Text>
-          <Text style={styles.bigSub}>{t("find_support_sub") || "Let our AI help you find the best caregiver match."}</Text>
+          <Text style={styles.bigSub}>
+            {t("find_support_sub") || "Let our AI help you find the best caregiver match."}
+          </Text>
 
           <Pressable onPress={() => navigation.navigate("FindCaregiver")} style={styles.searchPill}>
             <Ionicons name="search" size={18} color={theme.colors.primary} />
@@ -239,7 +252,9 @@ export default function FamilyHomeScreen({ navigation }: Props) {
         ) : recent.length === 0 ? (
           <View style={styles.emptyRecent}>
             <Text style={styles.emptyRecentTitle}>{t("no_bookings_yet") || "No bookings yet"}</Text>
-            <Text style={styles.emptyRecentSub}>{t("no_bookings_sub") || "Book a caregiver and your requests will appear here."}</Text>
+            <Text style={styles.emptyRecentSub}>
+              {t("no_bookings_sub") || "Book a caregiver and your requests will appear here."}
+            </Text>
           </View>
         ) : (
           recent.map((b) => {
@@ -255,7 +270,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
                 style={styles.bookingCard}
               >
                 <View style={styles.avatar} />
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.bookingName}>{caregiverName}</Text>
                   <Text style={styles.bookingMeta}>
                     {date} • {service}
@@ -277,6 +292,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
+
   header: {
     height: 56,
     flexDirection: "row",
@@ -286,14 +302,14 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   logoBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  logoText: { color: "white", fontWeight: "900" },
+  logoText: { color: "white", fontWeight: "900", fontSize: 16 },
   headerTitle: {
     flex: 1,
     textAlign: "center",
@@ -365,7 +381,7 @@ const styles = StyleSheet.create({
 
   greetCard: {
     backgroundColor: theme.colors.card,
-    borderRadius: 18,
+    borderRadius: 20,
     padding: theme.spacing.lg,
     flexDirection: "row",
     alignItems: "center",
@@ -381,8 +397,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  greetTitle: { fontSize: 16, fontWeight: "900", color: theme.colors.text },
-  greetSub: { marginTop: 3, fontSize: 12.5, color: theme.colors.muted },
+  greetTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  greetTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: theme.colors.text,
+    lineHeight: 22,
+  },
+  greetSub: {
+    marginTop: 4,
+    fontSize: 12.5,
+    color: theme.colors.muted,
+    lineHeight: 20,
+  },
   profileBtn: {
     width: 42,
     height: 42,
@@ -392,31 +422,62 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  bigCard: { marginTop: 14, backgroundColor: theme.colors.primary, borderRadius: 20, padding: theme.spacing.lg },
-  bigTitle: { color: "white", fontSize: 18, fontWeight: "900" },
-  bigSub: { marginTop: 6, color: "rgba(255,255,255,0.85)", fontSize: 13, lineHeight: 18 },
+  bigCard: {
+    marginTop: 16,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 24,
+    padding: theme.spacing.xl,
+  },
+  bigTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "900",
+    lineHeight: 26,
+  },
+  bigSub: {
+    marginTop: 8,
+    color: "rgba(255,255,255,0.88)",
+    fontSize: 14,
+    lineHeight: 22,
+  },
   searchPill: {
-    marginTop: 14,
+    marginTop: 16,
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     backgroundColor: "white",
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  searchPillText: { fontWeight: "900", color: theme.colors.primary },
+  searchPillText: {
+    fontWeight: "900",
+    color: theme.colors.primary,
+    fontSize: 15,
+  },
 
   sectionRow: {
-    marginTop: 18,
+    marginTop: 20,
     marginBottom: 10,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: 10,
   },
-  sectionTitle: { fontSize: 15, fontWeight: "900", color: theme.colors.text },
-  link: { fontWeight: "800", color: theme.colors.primary },
+  sectionTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "900",
+    color: theme.colors.text,
+    lineHeight: 22,
+  },
+  link: {
+    fontWeight: "800",
+    color: theme.colors.primary,
+    flexShrink: 1,
+    textAlign: "right",
+  },
 
   bookingCard: {
     backgroundColor: theme.colors.card,
@@ -430,8 +491,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   avatar: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#E9EEF8" },
-  bookingName: { fontSize: 14, fontWeight: "900", color: theme.colors.text },
-  bookingMeta: { marginTop: 2, fontSize: 12, color: theme.colors.muted },
+  bookingName: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: theme.colors.text,
+    lineHeight: 20,
+  },
+  bookingMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    color: theme.colors.muted,
+    lineHeight: 18,
+  },
 
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   badgeText: { fontSize: 11.5, fontWeight: "900" },
@@ -443,6 +514,16 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     padding: 16,
   },
-  emptyRecentTitle: { fontWeight: "900", color: theme.colors.text, fontSize: 14 },
-  emptyRecentSub: { marginTop: 6, color: theme.colors.muted, fontWeight: "700" },
+  emptyRecentTitle: {
+    fontWeight: "900",
+    color: theme.colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  emptyRecentSub: {
+    marginTop: 6,
+    color: theme.colors.muted,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
 });
