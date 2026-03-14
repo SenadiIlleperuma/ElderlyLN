@@ -1,14 +1,32 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+  Modal,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { theme } from "../../constants/theme";
-import { api } from "../../api/api"; 
+import { api } from "../../api/api";
+
+const LANGUAGES = [
+  { code: "en", label: "English", short: "EN" },
+  { code: "si", label: "සිංහල", short: "SI" },
+  { code: "ta", label: "தமிழ்", short: "TA" },
+];
+
 export default function AdminHomeScreen({ navigation }: any) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [loading, setLoading] = useState(true);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalBookings: 0,
@@ -16,22 +34,40 @@ export default function AdminHomeScreen({ navigation }: any) {
     urgentUnresolved: 0,
   });
 
- const fetchStats = async () => {
-  try {
-    setLoading(true);
-    const res = await api.get("/governance/admin/stats");
-    setStats(res.data);
-  } catch (e: any) {
-    console.log("Admin stats error:", e?.response?.data || e?.message);
-    Alert.alert("Error", e?.response?.data?.message || "Failed to load admin stats");
-  } finally {
-    setLoading(false);
-  }
-};
+  const currentLanguage =
+    LANGUAGES.find((lang) => lang.code === i18n.language) || LANGUAGES[0];
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/governance/admin/stats");
+      setStats(res.data);
+    } catch (e: any) {
+      console.log("Admin stats error:", e?.response?.data || e?.message);
+      Alert.alert("Error", e?.response?.data?.message || "Failed to load admin stats");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchStats();
   }, []);
+
+  const handleChangeLanguage = async (langCode: string) => {
+    try {
+      await i18n.changeLanguage(langCode);
+      await AsyncStorage.setItem("app_language", langCode);
+      setLanguageModalVisible(false);
+    } catch (error) {
+      console.log("Language change error:", error);
+    }
+  };
+
+  const onLogout = async () => {
+    await AsyncStorage.multiRemove(["token", "user", "role", "session"]);
+    navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
+  };
 
   const totalUsers = stats.totalUsers;
   const totalBookings = stats.totalBookings;
@@ -44,10 +80,49 @@ export default function AdminHomeScreen({ navigation }: any) {
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>{t("admin_console")}</Text>
 
-          <Pressable style={styles.iconBtn} onPress={fetchStats}>
-            <Ionicons name="refresh-outline" size={22} color={theme.colors.text} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable onPress={() => setLanguageModalVisible(true)} style={styles.langBtn}>
+              <Ionicons name="globe-outline" size={18} color="#94A3B8" />
+              <Text style={styles.langBtnText}>{currentLanguage.short}</Text>
+              <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+            </Pressable>
+
+            <Pressable style={styles.iconBtn} onPress={onLogout}>
+              <Ionicons name="log-out-outline" size={20} color={theme.colors.text} />
+            </Pressable>
+          </View>
         </View>
+
+        <Modal
+          transparent
+          visible={languageModalVisible}
+          animationType="fade"
+          onRequestClose={() => setLanguageModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setLanguageModalVisible(false)}>
+            <View style={styles.dropdownCard}>
+              {LANGUAGES.map((lang, index) => {
+                const selected = i18n.language === lang.code;
+                return (
+                  <Pressable
+                    key={lang.code}
+                    style={[styles.dropdownItem, index !== LANGUAGES.length - 1 && styles.dropdownBorder]}
+                    onPress={() => handleChangeLanguage(lang.code)}
+                  >
+                    <Text style={styles.dropdownText}>{lang.label}</Text>
+                    {selected && (
+                      <Ionicons
+                        name="checkmark-circle-outline"
+                        size={18}
+                        color="#94A3B8"
+                      />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Modal>
 
         {loading && (
           <View style={{ paddingVertical: 10 }}>
@@ -67,8 +142,12 @@ export default function AdminHomeScreen({ navigation }: any) {
           </View>
 
           <View style={[styles.metricCard, styles.metricDark]}>
-            <Text style={[styles.metricLabel, { color: "rgba(255,255,255,0.7)" }]}>{t("bookings")}</Text>
-            <Text style={[styles.metricValue, { color: "#fff" }]}>{totalBookings.toLocaleString()}</Text>
+            <Text style={[styles.metricLabel, { color: "rgba(255,255,255,0.7)" }]}>
+              {t("bookings")}
+            </Text>
+            <Text style={[styles.metricValue, { color: "#fff" }]}>
+              {totalBookings.toLocaleString()}
+            </Text>
 
             <View style={[styles.deltaPill, { backgroundColor: "rgba(34,197,94,0.25)" }]}>
               <Ionicons name="pulse-outline" size={14} color="#22c55e" />
@@ -129,15 +208,68 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   headerTitle: { fontSize: 22, fontWeight: "900", color: theme.colors.text },
+
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  langBtn: {
+    height: 32,
+    paddingHorizontal: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: "transparent",
+  },
+  langBtnText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.colors.text,
+  },
   iconBtn: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
     borderRadius: 14,
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#E8EEF8",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.10)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+    paddingTop: 82,
+    paddingRight: 20,
+  },
+  dropdownCard: {
+    width: 200,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E8EEF8",
+  },
+  dropdownItem: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dropdownBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+  dropdownText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: "700",
   },
 
   cardRow: { flexDirection: "row", gap: 12, marginTop: 10 },
@@ -151,7 +283,12 @@ const styles = StyleSheet.create({
   metricBlue: { backgroundColor: "#2E6BFF" },
   metricDark: { backgroundColor: "#0B1220" },
 
-  metricLabel: { fontWeight: "900", color: "rgba(255,255,255,0.75)", textTransform: "uppercase", fontSize: 12 },
+  metricLabel: {
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.75)",
+    textTransform: "uppercase",
+    fontSize: 12,
+  },
   metricValue: { fontWeight: "900", fontSize: 34, color: "#fff" },
 
   deltaPill: {
@@ -174,7 +311,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E8EEF8",
   },
-  sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+  },
   sectionTitle: { fontWeight: "900", color: theme.colors.text, fontSize: 16 },
 
   manageItem: {
@@ -218,5 +360,11 @@ const styles = StyleSheet.create({
     borderColor: "#FFE4E6",
   },
   urgentBtnText: { fontWeight: "900", color: "#be123c" },
-  urgentSmall: { marginTop: 10, fontWeight: "800", color: "#be123c", opacity: 0.8, fontSize: 12 },
+  urgentSmall: {
+    marginTop: 10,
+    fontWeight: "800",
+    color: "#be123c",
+    opacity: 0.8,
+    fontSize: 12,
+  },
 });
