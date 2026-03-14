@@ -1,10 +1,19 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Modal,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
 import { useFocusEffect } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { AuthStackParamList, BookingRow } from "../../RootNavigator";
 import { theme } from "../../constants/theme";
@@ -21,6 +30,12 @@ type Shift = {
   title: string;
   time: string;
 };
+
+const LANGUAGES = [
+  { code: "en", label: "English", short: "EN" },
+  { code: "si", label: "සිංහල", short: "SI" },
+  { code: "ta", label: "தமிழ்", short: "TA" },
+];
 
 function cleanText(v: any) {
   const s = String(v ?? "").trim();
@@ -45,7 +60,7 @@ function formatShiftTime(iso: string) {
 function normStatus(s: any) {
   return String(s ?? "")
     .trim()
-    .toLowerCase(); // requested/accepted/completed/declined
+    .toLowerCase();
 }
 
 function isSameMonth(d: Date, ref: Date) {
@@ -63,17 +78,21 @@ function formatLKR(n: number) {
 }
 
 export default function CaregiverHomeScreen({ navigation }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [name, setName] = useState<string>("");
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loadingBookings, setLoadingBookings] = useState<boolean>(true);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+
+  const currentLanguage =
+    LANGUAGES.find((lang) => lang.code === i18n.language) || LANGUAGES[0];
 
   useEffect(() => {
     (async () => {
-     const u = (await getUser()) as any;
-     const nm = u?.name || u?.full_name || u?.fullName || "";
-     if (nm) setName(String(nm));
+      const u = (await getUser()) as any;
+      const nm = u?.name || u?.full_name || u?.fullName || "";
+      if (nm) setName(String(nm));
     })();
   }, []);
 
@@ -114,6 +133,21 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
       loadBookings();
     }, [loadBookings])
   );
+
+  const handleChangeLanguage = async (langCode: string) => {
+    try {
+      await i18n.changeLanguage(langCode);
+      await AsyncStorage.setItem("app_language", langCode);
+      setLanguageModalVisible(false);
+    } catch (error) {
+      console.log("Language change error:", error);
+    }
+  };
+
+  const onLogout = async () => {
+    await AsyncStorage.multiRemove(["token", "user", "role", "session"]);
+    navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
+  };
 
   const {
     jobRequestsCount,
@@ -170,14 +204,46 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>{t("dashboard")}</Text>
 
-          <View style={styles.onlinePill}>
-            <Text style={styles.onlineText}>{t("online")}</Text>
+          <View style={styles.headerActions}>
+            <Pressable onPress={() => setLanguageModalVisible(true)} style={styles.langBtn}>
+              <Ionicons name="globe-outline" size={18} color="#94A3B8" />
+              <Text style={styles.langBtnText}>{currentLanguage.short}</Text>
+              <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+            </Pressable>
+
+            <Pressable onPress={onLogout} style={styles.iconBtn}>
+              <Ionicons name="log-out-outline" size={20} color={theme.colors.text} />
+            </Pressable>
           </View>
         </View>
 
+        <Modal
+          transparent
+          visible={languageModalVisible}
+          animationType="fade"
+          onRequestClose={() => setLanguageModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setLanguageModalVisible(false)}>
+            <View style={styles.dropdownCard}>
+              {LANGUAGES.map((lang, index) => {
+                const selected = i18n.language === lang.code;
+                return (
+                  <Pressable
+                    key={lang.code}
+                    style={[styles.dropdownItem, index !== LANGUAGES.length - 1 && styles.dropdownBorder]}
+                    onPress={() => handleChangeLanguage(lang.code)}
+                  >
+                    <Text style={styles.dropdownText}>{lang.label}</Text>
+                    {selected && <Ionicons name="checkmark-circle-outline" size={18} color="#94A3B8" />}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Modal>
+
         {!!name && <Text style={styles.greeting}>{t("hi_name", { name })}</Text>}
 
-        {/* Earnings Card */}
         <View style={styles.bigCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.bigLabel}>{t("total_earnings")}</Text>
@@ -214,7 +280,6 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* Tiles */}
         <View style={styles.tilesRow}>
           <Pressable style={styles.tile} onPress={() => navigation.navigate("JobRequests")}>
             <View style={styles.tileIconWrap}>
@@ -235,7 +300,6 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
-        {/* Upcoming shifts */}
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>{t("upcoming_shifts")}</Text>
           <Pressable onPress={() => navigation.navigate("CaregiverAlerts")}>
@@ -322,16 +386,67 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.colors.text,
   },
-  onlinePill: {
-    backgroundColor: "#DCFCE7",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
-  onlineText: {
+  langBtn: {
+    height: 32,
+    paddingHorizontal: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: "transparent",
+  },
+  langBtnText: {
+    fontSize: 12,
     fontWeight: "900",
-    color: "#166534",
-    letterSpacing: 0.5,
+    color: theme.colors.text,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E8EEF8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.10)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+    paddingTop: 82,
+    paddingRight: 20,
+  },
+  dropdownCard: {
+    width: 200,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E8EEF8",
+  },
+  dropdownItem: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dropdownBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+  dropdownText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: "700",
   },
 
   greeting: {

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
+import { View,Text, StyleSheet, Pressable,ScrollView,ActivityIndicator, RefreshControl, Modal,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -26,6 +26,12 @@ type BookingRow = {
 
 type BookingStatusUI = "UPCOMING" | "COMPLETED" | "REQUESTED";
 
+const LANGUAGES = [
+  { code: "en", label: "English", short: "EN" },
+  { code: "si", label: "සිංහල", short: "SI" },
+  { code: "ta", label: "தமிழ்", short: "TA" },
+];
+
 function formatShortDate(iso: string) {
   const d = new Date(iso);
   const y = d.getFullYear();
@@ -48,12 +54,16 @@ function toUiStatus(s: BookingRow["booking_status"]): BookingStatusUI {
 }
 
 export default function FamilyHomeScreen({ navigation }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [fullName, setFullName] = useState<string>("");
   const [recent, setRecent] = useState<BookingRow[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+
+  const currentLanguage =
+    LANGUAGES.find((lang) => lang.code === i18n.language) || LANGUAGES[0];
 
   const loadUserName = async () => {
     try {
@@ -80,7 +90,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       setLoadingRecent(true);
       const res = await api.get("/booking/myBookings");
       const all: BookingRow[] = Array.isArray(res.data) ? res.data : [];
-      setRecent(all.slice(0, 2)); 
+      setRecent(all.slice(0, 2));
     } catch (err: any) {
       console.log("Home recent bookings error:", err?.response?.data || err?.message);
       setRecent([]);
@@ -103,6 +113,16 @@ export default function FamilyHomeScreen({ navigation }: Props) {
     setRefreshing(false);
   }, []);
 
+  const handleChangeLanguage = async (langCode: string) => {
+    try {
+      await i18n.changeLanguage(langCode);
+      await AsyncStorage.setItem("app_language", langCode);
+      setLanguageModalVisible(false);
+    } catch (error) {
+      console.log("Language change error:", error);
+    }
+  };
+
   const statusLabel = (s: BookingStatusUI) => {
     if (s === "UPCOMING") return t("status_upcoming") || "Upcoming";
     if (s === "COMPLETED") return t("status_completed") || "Completed";
@@ -120,7 +140,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
   };
 
   const onLogout = async () => {
-    await AsyncStorage.multiRemove(["token", "user"]);
+    await AsyncStorage.multiRemove(["token", "user", "role", "session"]);
     navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
   };
 
@@ -133,10 +153,43 @@ export default function FamilyHomeScreen({ navigation }: Props) {
 
         <Text style={styles.headerTitle}>{t("nav_home") || "Home"}</Text>
 
-        <Pressable onPress={onLogout} style={styles.headerBtn}>
-          <Ionicons name="log-out-outline" size={22} color={theme.colors.muted} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => setLanguageModalVisible(true)} style={styles.langBtn}>
+            <Ionicons name="globe-outline" size={18} color="#94A3B8" />
+            <Text style={styles.langBtnText}>{currentLanguage.short}</Text>
+            <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+          </Pressable>
+
+          <Pressable onPress={onLogout} style={styles.headerBtn}>
+            <Ionicons name="log-out-outline" size={20} color={theme.colors.muted} />
+          </Pressable>
+        </View>
       </View>
+
+      <Modal
+        transparent
+        visible={languageModalVisible}
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setLanguageModalVisible(false)}>
+          <View style={styles.dropdownCard}>
+            {LANGUAGES.map((lang, index) => {
+              const selected = i18n.language === lang.code;
+              return (
+                <Pressable
+                  key={lang.code}
+                  style={[styles.dropdownItem, index !== LANGUAGES.length - 1 && styles.dropdownBorder]}
+                  onPress={() => handleChangeLanguage(lang.code)}
+                >
+                  <Text style={styles.dropdownText}>{lang.label}</Text>
+                  {selected && <Ionicons name="checkmark-circle-outline" size={18} color="#94A3B8" />}
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -248,7 +301,66 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.colors.text,
   },
-  headerBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 12 },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  langBtn: {
+    height: 32,
+    paddingHorizontal: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: "transparent",
+  },
+  langBtnText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: theme.colors.text,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.10)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+    paddingTop: 82,
+    paddingRight: 18,
+  },
+  dropdownCard: {
+    width: 200,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E8EEF8",
+  },
+  dropdownItem: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dropdownBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F7",
+  },
+  dropdownText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: "700",
+  },
+
   content: { padding: theme.spacing.lg },
 
   greetCard: {
