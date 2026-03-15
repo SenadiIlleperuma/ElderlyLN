@@ -24,19 +24,42 @@ const toNumber = (v, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-const normalizeText = (v) => (v === null || v === undefined ? "" : String(v));
+const normalizeText = (v) => (v === null || v === undefined ? "" : String(v).trim());
 
 const normalizeArrayFromDB = (v) => {
   if (!v) return [];
-  if (Array.isArray(v)) return v.map(String).filter(Boolean);
-  const s = String(v).trim();
+  if (Array.isArray(v)) return v.map(String).map((x) => x.trim()).filter(Boolean);
+
+  let s = String(v).trim();
   if (!s) return [];
+
+  if (s.startsWith("{") && s.endsWith("}")) {
+    s = s.slice(1, -1);
+  }
+
   return s.split(",").map((x) => x.trim()).filter(Boolean);
+};
+
+const normalizeProfileStatus = (status) => {
+  const s = normalizeText(status).toUpperCase().replace(/\s+/g, "_");
+  if (s === "VERIFIED") return "VERIFIED";
+  if (s === "PENDING_VERIFICATION" || s === "PENDING") return "PENDING_VERIFICATION";
+  if (s === "REJECTED") return "REJECTED";
+  return s || "UNKNOWN";
+};
+
+const statusPriority = (status) => {
+  const normalized = normalizeProfileStatus(status);
+  if (normalized === "VERIFIED") return 3;
+  if (normalized === "PENDING_VERIFICATION") return 2;
+  if (normalized === "REJECTED") return 1;
+  return 0;
 };
 
 const computeHourlyRate = (expectedSalary, preferredTime) => {
   const salary = toNumber(expectedSalary, 0);
   const period = normalizeText(preferredTime).toLowerCase();
+
   if (!salary) return 0;
 
   if (period.includes("hour")) return salary;
@@ -47,7 +70,7 @@ const computeHourlyRate = (expectedSalary, preferredTime) => {
   return salary;
 };
 
-const getCaregiversFromDB = async (filters) => {
+const getCaregiversFromDB = async (filters = {}) => {
   let sql = `
     SELECT
       c.caregiver_id,
@@ -57,29 +80,27 @@ const getCaregiversFromDB = async (filters) => {
       c.age,
       c.gender,
       c.edu_level AS education_level,
-
       COALESCE(array_to_string(c.qualifications, ', '), '') AS qualification,
       COALESCE(c.experience_years, 0) AS years_experience,
       COALESCE(array_to_string(c.languages_spoken, ', '), '') AS languages_spoken,
       COALESCE(array_to_string(c.care_category, ', '), '') AS care_category,
-
       c.service_type AS care_service_type,
       c.availability_period AS preferred_time,
-
       COALESCE(c.expected_rate, 0) AS expected_salary,
-      COALESCE(c.avg_rating, 0) AS rating
+      COALESCE(c.avg_rating, 0) AS rating,
+      c.profile_status,
+      COALESCE(u.role, 'caregiver') AS user_role
     FROM caregiver c
-    JOIN "user" u ON c.user_fk = u.user_id
-    WHERE u.role = 'caregiver'
-      AND c.profile_status = ANY($1::text[])
+    LEFT JOIN "user" u ON c.user_fk = u.user_id
+    WHERE 1=1
   `;
 
-  const params = [[ "Verified", "Pending Verification" ]];
-  let i = 2;
+  const params = [];
+  let i = 1;
 
   if (filters.district && filters.district.trim() !== "") {
     sql += ` AND LOWER(c.district) = LOWER($${i})`;
-    params.push(filters.district);
+    params.push(filters.district.trim());
     i++;
   }
 
@@ -91,42 +112,44 @@ const getCaregiversFromDB = async (filters) => {
         WHERE LOWER(cc.item) LIKE LOWER($${i})
       )
     `;
-    params.push(`%${filters.careCategory}%`);
+    params.push(`%${filters.careCategory.trim()}%`);
     i++;
   }
 
   if (filters.serviceType && filters.serviceType.trim() !== "") {
     const allowed = SERVICE_TYPE_MAP[filters.serviceType] || [];
+
     if (allowed.length > 0) {
       sql += ` AND (`;
       allowed.forEach((val, idx) => {
         if (idx > 0) sql += ` OR `;
-        sql += ` LOWER(c.service_type) = LOWER($${i}) `;
+        sql += `LOWER(c.service_type) = LOWER($${i})`;
         params.push(val);
         i++;
       });
       sql += `)`;
     } else {
       sql += ` AND LOWER(c.service_type) LIKE LOWER($${i})`;
-      params.push(`%${filters.serviceType}%`);
+      params.push(`%${filters.serviceType.trim()}%`);
       i++;
     }
   }
 
   if (filters.timePeriod && filters.timePeriod.trim() !== "") {
     const allowed = TIME_PERIOD_MAP[filters.timePeriod] || [];
+
     if (allowed.length > 0) {
       sql += ` AND (`;
       allowed.forEach((val, idx) => {
         if (idx > 0) sql += ` OR `;
-        sql += ` LOWER(c.availability_period) = LOWER($${i}) `;
+        sql += `LOWER(c.availability_period) = LOWER($${i})`;
         params.push(val);
         i++;
       });
       sql += `)`;
     } else {
       sql += ` AND LOWER(c.availability_period) LIKE LOWER($${i})`;
-      params.push(`%${filters.timePeriod}%`);
+      params.push(`%${filters.timePeriod.trim()}%`);
       i++;
     }
   }
@@ -139,7 +162,7 @@ const getCaregiversFromDB = async (filters) => {
         OR LOWER(array_to_string(c.care_category, ',')) LIKE LOWER($${i})
       )
     `;
-    params.push(`%${filters.needs}%`);
+    params.push(`%${filters.needs.trim()}%`);
     i++;
   }
 
@@ -149,20 +172,30 @@ const getCaregiversFromDB = async (filters) => {
 
 const runMLPrediction = (caregivers, familyRequirements) => {
   return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({ caregivers, familyRequirements });
+
     const pythonProcess = spawn("python3", [
       PYTHON_SCRIPT_PATH,
-      JSON.stringify({ caregivers, familyRequirements }),
+      payload,
       ML_MODEL_PATH,
     ]);
 
     let out = "";
     let err = "";
 
-    pythonProcess.stdout.on("data", (d) => (out += d.toString()));
-    pythonProcess.stderr.on("data", (d) => (err += d.toString()));
+    pythonProcess.stdout.on("data", (d) => {
+      out += d.toString();
+    });
+
+    pythonProcess.stderr.on("data", (d) => {
+      err += d.toString();
+    });
 
     pythonProcess.on("close", (code) => {
-      if (code !== 0) return reject(new Error("ML prediction failed: " + err));
+      if (code !== 0) {
+        return reject(new Error("ML prediction failed: " + err));
+      }
+
       try {
         resolve(JSON.parse(out));
       } catch {
@@ -172,46 +205,95 @@ const runMLPrediction = (caregivers, familyRequirements) => {
   });
 };
 
-const getPredictions = async (filters) => {
+const sortWithStatusPriority = (items) => {
+  return items.sort((a, b) => {
+    const matchDiff = toNumber(b.matchPercent, 0) - toNumber(a.matchPercent, 0);
+    if (matchDiff !== 0) return matchDiff;
+
+    const statusDiff = statusPriority(b.profile_status) - statusPriority(a.profile_status);
+    if (statusDiff !== 0) return statusDiff;
+
+    const ratingDiff = toNumber(b.rating, 0) - toNumber(a.rating, 0);
+    if (ratingDiff !== 0) return ratingDiff;
+
+    return toNumber(b.years_experience, 0) - toNumber(a.years_experience, 0);
+  });
+};
+
+const buildFallbackResults = (caregivers) => {
+  const mapped = caregivers.map((cg) => ({
+    id: String(cg.caregiver_id),
+    caregiver_id: String(cg.caregiver_id),
+    name: cg.name || "Unknown",
+    district: cg.district || "Unknown",
+    rating: toNumber(cg.rating, 0),
+    reviewsCount: 0,
+    care_service_type: cg.care_service_type || "",
+    preferred_time: cg.preferred_time || "",
+    languages_spoken: normalizeArrayFromDB(cg.languages_spoken),
+    expected_rate: toNumber(cg.expected_salary, 0),
+    years_experience: toNumber(cg.years_experience, 0),
+    care_category: normalizeArrayFromDB(cg.care_category),
+    qualification: normalizeArrayFromDB(cg.qualification),
+    about: "Experienced caregiver",
+    ratePerHour: computeHourlyRate(cg.expected_salary, cg.preferred_time),
+    profile_status: normalizeProfileStatus(cg.profile_status),
+    matchPercent: 75,
+  }));
+
+  return sortWithStatusPriority(mapped);
+};
+
+const getPredictions = async (filters = {}) => {
   const caregivers = await getCaregiversFromDB(filters);
   if (caregivers.length === 0) return [];
 
   console.log(`Found ${caregivers.length} caregivers in DB, running ML...`);
-  const matches = await runMLPrediction(caregivers, filters);
 
-  const byId = new Map();
-  caregivers.forEach((c) => byId.set(String(c.caregiver_id), c));
+  try {
+    const matches = await runMLPrediction(caregivers, filters);
 
-  const merged = (matches || [])
-    .map((m) => {
-      const cid = String(m.caregiver_id || m.caregiverId || m.id || "");
-      const base = byId.get(cid);
-      if (!base) return null;
+    const byId = new Map();
+    caregivers.forEach((c) => byId.set(String(c.caregiver_id), c));
 
-      return {
-        ...m,
+    const merged = (matches || [])
+      .map((m) => {
+        const cid = String(m.caregiver_id || m.caregiverId || m.id || "");
+        const base = byId.get(cid);
+        if (!base) return null;
 
-        id: cid,
-        caregiver_id: cid,
+        return {
+          ...m,
+          id: cid,
+          caregiver_id: cid,
+          name: base.name,
+          district: base.district,
+          rating: toNumber(base.rating, 0),
+          reviewsCount: 0,
+          care_service_type: base.care_service_type,
+          preferred_time: base.preferred_time,
+          languages_spoken: normalizeArrayFromDB(base.languages_spoken),
+          expected_rate: toNumber(base.expected_salary, 0),
+          years_experience: toNumber(base.years_experience, 0),
+          care_category: normalizeArrayFromDB(base.care_category),
+          qualification: normalizeArrayFromDB(base.qualification),
+          about: "Experienced caregiver",
+          ratePerHour: computeHourlyRate(base.expected_salary, base.preferred_time),
+          profile_status: normalizeProfileStatus(base.profile_status),
+          matchPercent: toNumber(m.matchPercent, 75),
+        };
+      })
+      .filter(Boolean);
 
-        name: base.name,
-        district: base.district,
-        rating: Number(base.rating) || 0,
-        reviewsCount: Number(base.reviews_count) || 0,
+    if (merged.length > 0) {
+      return sortWithStatusPriority(merged);
+    }
 
-        care_service_type: base.care_service_type,
-        preferred_time: base.preferred_time,
-        languages_spoken: base.languages_spoken,
-
-        expected_rate: Number(base.expected_salary) || 0,
-        years_experience: Number(base.years_experience) || 0,
-
-        care_category: base.care_category,
-        qualification: base.qualification,
-      };
-    })
-    .filter(Boolean);
-
-  return merged;
+    return buildFallbackResults(caregivers);
+  } catch (error) {
+    console.error("ML failed, returning fallback caregiver results:", error.message);
+    return buildFallbackResults(caregivers);
+  }
 };
+
 module.exports = { getPredictions };
