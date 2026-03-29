@@ -97,6 +97,60 @@ def normalize_family_value(value, fallback):
     return s
 
 
+def normalize_profile_status(status):
+    s = safe_str(status, "").upper().replace(" ", "_")
+    if s == "VERIFIED":
+        return "VERIFIED"
+    if s in ["PENDING", "PENDING_VERIFICATION"]:
+        return "PENDING_VERIFICATION"
+    if s == "REJECTED":
+        return "REJECTED"
+    return s or "UNKNOWN"
+
+
+def experience_score(years_exp):
+    if years_exp >= 5:
+        return 99
+    if years_exp >= 4:
+        return 95
+    if years_exp >= 3:
+        return 91
+    if years_exp >= 2:
+        return 87
+    if years_exp >= 1:
+        return 82
+    if years_exp >= 0.5:
+        return 74
+    return 65
+
+
+def status_bonus(profile_status):
+    if profile_status == "VERIFIED":
+        return 2
+    if profile_status == "PENDING_VERIFICATION":
+        return 0
+    if profile_status == "REJECTED":
+        return -6
+    return 0
+
+
+def rating_bonus(rating):
+    if rating >= 4.5:
+        return 1
+    return 0
+
+
+def get_ml_adjustment(score):
+    pct = int(round(float(score) * 100))
+    if pct >= 90:
+        return 1
+    if pct >= 75:
+        return 0
+    if pct >= 50:
+        return -1
+    return -3
+
+
 def predict_matches(payload, model_path):
     caregivers = payload.get("caregivers", [])
     family = payload.get("familyRequirements", {})
@@ -121,26 +175,26 @@ def predict_matches(payload, model_path):
 
     rows = []
     for cg in caregivers:
-      caregiver_district = safe_str(cg.get("district"), "Colombo")
-      caregiver_category = safe_str(cg.get("care_category"), "Elderly")
-      caregiver_service_type = safe_str(cg.get("care_service_type"), "Care Only")
-      caregiver_preferred_time = safe_str(cg.get("preferred_time"), "Full Day")
+        caregiver_district = safe_str(cg.get("district"), "Colombo")
+        caregiver_category = safe_str(cg.get("care_category"), "Elderly")
+        caregiver_service_type = safe_str(cg.get("care_service_type"), "Care Only")
+        caregiver_preferred_time = safe_str(cg.get("preferred_time"), "Full Day")
 
-      row = {
-          "Age": safe_int(cg.get("age"), 30),
-          "Gender": safe_str(cg.get("gender"), "Female"),
-          "District": normalize_family_value(family.get("district"), caregiver_district),
-          "Education_Level": safe_str(cg.get("education_level"), "Diploma"),
-          "Qualification": safe_str(cg.get("qualification"), "Caregiver"),
-          "Years_Experience": safe_int(cg.get("years_experience"), 3),
-          "Languages_Spoken": first_language(cg.get("languages_spoken"), "Sinhala"),
-          "Care_Category": normalize_family_value(family.get("careCategory"), caregiver_category),
-          "Care_Service_Type": normalize_family_value(family.get("serviceType"), caregiver_service_type),
-          "Preferred_Time": normalize_family_value(family.get("timePeriod"), caregiver_preferred_time),
-          "Expected_Salary": safe_int(cg.get("expected_salary"), 1000),
-      }
+        row = {
+            "Age": safe_int(cg.get("age"), 30),
+            "Gender": safe_str(cg.get("gender"), "Female"),
+            "District": normalize_family_value(family.get("district"), caregiver_district),
+            "Education_Level": safe_str(cg.get("education_level"), "Diploma"),
+            "Qualification": safe_str(cg.get("qualification"), "Caregiver"),
+            "Years_Experience": safe_int(cg.get("years_experience"), 0),
+            "Languages_Spoken": first_language(cg.get("languages_spoken"), "Sinhala"),
+            "Care_Category": normalize_family_value(family.get("careCategory"), caregiver_category),
+            "Care_Service_Type": normalize_family_value(family.get("serviceType"), caregiver_service_type),
+            "Preferred_Time": normalize_family_value(family.get("timePeriod"), caregiver_preferred_time),
+            "Expected_Salary": safe_int(cg.get("expected_salary"), 1000),
+        }
 
-      rows.append(row)
+        rows.append(row)
 
     X = pd.DataFrame(rows)
 
@@ -177,26 +231,43 @@ def predict_matches(payload, model_path):
 
     results = []
     for i, cg in enumerate(caregivers):
-        match_percent = int(round(float(scores[i]) * 100))
-        match_percent = max(65, min(99, match_percent))
+        years_exp = safe_float(cg.get("years_experience"), 0)
+        rating = safe_float(cg.get("rating"), 0.0)
+        profile_status = normalize_profile_status(cg.get("profile_status"))
+
+        base = experience_score(years_exp)
+        final_match = base + status_bonus(profile_status) + rating_bonus(rating) + get_ml_adjustment(scores[i])
+        final_match = max(65, min(99, int(round(final_match))))
 
         results.append(
             {
                 "id": str(cg.get("caregiver_id") or ""),
                 "name": safe_str(cg.get("name"), "Unknown"),
                 "district": safe_str(cg.get("district"), "Unknown"),
-                "rating": safe_float(cg.get("rating"), 0.0),
+                "rating": rating,
                 "reviewsCount": safe_int(cg.get("reviews_count"), 0),
                 "ratePerHour": safe_int(cg.get("expected_salary"), 0),
-                "experienceYears": safe_int(cg.get("years_experience"), 0),
+                "experienceYears": years_exp,
+                "years_experience": years_exp,
                 "about": safe_str(cg.get("about"), "Experienced caregiver"),
                 "specialties": to_list(cg.get("specialties") or cg.get("care_category")),
                 "qualifications": to_list(cg.get("qualifications_list") or cg.get("qualification")),
-                "matchPercent": match_percent,
+                "profile_status": profile_status,
+                "rawMlScore": int(round(float(scores[i]) * 100)),
+                "matchPercent": final_match,
             }
         )
 
-    results.sort(key=lambda x: x["matchPercent"], reverse=True)
+    results.sort(
+        key=lambda x: (
+            x["matchPercent"],
+            1 if x["profile_status"] == "VERIFIED" else 0,
+            x["experienceYears"],
+            x["rating"],
+        ),
+        reverse=True,
+    )
+
     return results
 
 
