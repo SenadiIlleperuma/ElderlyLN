@@ -2,7 +2,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 const db = require("../db");
 
-const ML_MODEL_PATH = path.join(__dirname, "../../elderlyLn-ml/caregiver_matcher_01.pkl");
+const ML_MODEL_PATH = path.join(__dirname, "../../elderlyLn-ml/elderlyln_matcher_final.pkl");
 const PYTHON_SCRIPT_PATH = path.join(__dirname, "../ml/predict.py");
 
 const SERVICE_TYPE_MAP = {
@@ -213,10 +213,15 @@ const sortWithStatusPriority = (items) => {
     const statusDiff = statusPriority(b.profile_status) - statusPriority(a.profile_status);
     if (statusDiff !== 0) return statusDiff;
 
+    const expDiff =
+      toNumber(b.years_experience ?? b.experienceYears, 0) -
+      toNumber(a.years_experience ?? a.experienceYears, 0);
+    if (expDiff !== 0) return expDiff;
+
     const ratingDiff = toNumber(b.rating, 0) - toNumber(a.rating, 0);
     if (ratingDiff !== 0) return ratingDiff;
 
-    return toNumber(b.years_experience, 0) - toNumber(a.years_experience, 0);
+    return 0;
   });
 };
 
@@ -239,6 +244,7 @@ const buildFallbackResults = (caregivers) => {
     ratePerHour: computeHourlyRate(cg.expected_salary, cg.preferred_time),
     profile_status: normalizeProfileStatus(cg.profile_status),
     matchPercent: 75,
+    rawMatchPercent: 75,
   }));
 
   return sortWithStatusPriority(mapped);
@@ -249,7 +255,6 @@ const getPredictions = async (filters = {}) => {
   if (caregivers.length === 0) return [];
 
   console.log(`Found ${caregivers.length} caregivers in DB, running ML...`);
-
   try {
     const matches = await runMLPrediction(caregivers, filters);
 
@@ -258,42 +263,47 @@ const getPredictions = async (filters = {}) => {
 
     const merged = (matches || [])
       .map((m) => {
-        const cid = String(m.caregiver_id || m.caregiverId || m.id || "");
-        const base = byId.get(cid);
-        if (!base) return null;
+        const original = byId.get(String(m.id));
+        if (!original) return null;
 
         return {
-          ...m,
-          id: cid,
-          caregiver_id: cid,
-          name: base.name,
-          district: base.district,
-          rating: toNumber(base.rating, 0),
-          reviewsCount: 0,
-          care_service_type: base.care_service_type,
-          preferred_time: base.preferred_time,
-          languages_spoken: normalizeArrayFromDB(base.languages_spoken),
-          expected_rate: toNumber(base.expected_salary, 0),
-          years_experience: toNumber(base.years_experience, 0),
-          care_category: normalizeArrayFromDB(base.care_category),
-          qualification: normalizeArrayFromDB(base.qualification),
-          about: "Experienced caregiver",
-          ratePerHour: computeHourlyRate(base.expected_salary, base.preferred_time),
-          profile_status: normalizeProfileStatus(base.profile_status),
-          matchPercent: toNumber(m.matchPercent, 75),
+          id: String(original.caregiver_id),
+          caregiver_id: String(original.caregiver_id),
+          name: m.name || original.name || "Unknown",
+          district: m.district || original.district || "Unknown",
+          rating: toNumber(m.rating, toNumber(original.rating, 0)),
+          reviewsCount: toNumber(m.reviewsCount, 0),
+          care_service_type: original.care_service_type || "",
+          preferred_time: original.preferred_time || "",
+          languages_spoken: normalizeArrayFromDB(original.languages_spoken),
+          expected_rate: toNumber(original.expected_salary, 0),
+          years_experience: toNumber(
+            m.years_experience ?? m.experienceYears,
+            toNumber(original.years_experience, 0)
+          ),
+          experienceYears: toNumber(
+            m.experienceYears ?? m.years_experience,
+            toNumber(original.years_experience, 0)
+          ),
+          care_category: normalizeArrayFromDB(original.care_category),
+          qualification: normalizeArrayFromDB(original.qualification),
+          about: m.about || "Experienced caregiver",
+          ratePerHour: computeHourlyRate(original.expected_salary, original.preferred_time),
+          profile_status: normalizeProfileStatus(m.profile_status || original.profile_status),
+          rawMatchPercent: toNumber(m.rawMatchPercent, toNumber(m.matchPercent, 0)),
+          matchPercent: toNumber(m.matchPercent, 0),
         };
       })
       .filter(Boolean);
-
-    if (merged.length > 0) {
-      return sortWithStatusPriority(merged);
+    if (merged.length === 0) {
+      return buildFallbackResults(caregivers);
     }
-
-    return buildFallbackResults(caregivers);
+    return sortWithStatusPriority(merged);
   } catch (error) {
-    console.error("ML failed, returning fallback caregiver results:", error.message);
+    console.error("ML prediction failed, using fallback:", error.message);
     return buildFallbackResults(caregivers);
   }
 };
-
-module.exports = { getPredictions };
+module.exports = {
+  getPredictions,
+};

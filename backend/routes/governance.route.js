@@ -6,13 +6,14 @@ const { authenticateToken } = require("../middleware/auth.middleware");
 router.use(authenticateToken);
 
 // FAMILY/CAREGIVER: FILE COMPLAINT
-// POST /api/governance/fileComplaint
 router.post("/fileComplaint", async (req, res) => {
   try {
     const { bookingId, reason } = req.body;
 
     if (!bookingId || !reason) {
-      return res.status(400).json({ message: "Booking ID and reason are required to file a complaint." });
+      return res.status(400).json({
+        message: "Booking ID and reason are required to file a complaint.",
+      });
     }
 
     const result = await governanceService.fileComplaint(
@@ -22,72 +23,76 @@ router.post("/fileComplaint", async (req, res) => {
       req.user.role
     );
 
-    res.status(201).json({ message: "Complaint filed successfully.", result });
+    return res.status(201).json({ message: "Complaint filed successfully.", result });
   } catch (error) {
-    console.error("Complaint filing error:", error.message);
-    res.status(400).json({ message: error.message });
+    console.error("Complaint filing error:", error);
+    return res.status(400).json({ message: error.message });
   }
 });
 
 // ADMIN: DASHBOARD STATS
-// GET /api/governance/admin/stats
 router.get("/admin/stats", async (req, res) => {
   try {
     if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Only admin users can view admin stats." });
+      return res.status(403).json({
+        message: "Forbidden: Only admin users can view admin stats.",
+      });
     }
 
     const stats = await governanceService.getAdminStats();
-    res.json(stats);
+    return res.json(stats);
   } catch (error) {
-    console.error("Admin stats error:", error.message);
-    res.status(400).json({ message: error.message });
+    console.error("Admin stats error:", error);
+    return res.status(400).json({ message: error.message });
   }
 });
 
 // ADMIN: VERIFICATION QUEUE
-// GET /api/governance/admin/verificationQueue
 router.get("/admin/verificationQueue", async (req, res) => {
   try {
     if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Only admin users can view verification queue." });
+      return res.status(403).json({
+        message: "Forbidden: Only admin users can view verification queue.",
+      });
     }
 
     const rows = await governanceService.getVerificationQueue();
-    res.json(rows);
+    return res.json(rows);
   } catch (error) {
-    console.error("Verification queue error:", error.message);
-    res.status(400).json({ message: error.message });
+    console.error("Verification queue error:", error);
+    return res.status(400).json({ message: error.message });
   }
 });
 
 // ADMIN: CAREGIVER VERIFICATION DETAILS
-// GET /api/governance/admin/caregiver/:caregiverId
 router.get("/admin/caregiver/:caregiverId", async (req, res) => {
   try {
     if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Only admin users can view caregiver verification details." });
+      return res.status(403).json({
+        message: "Forbidden: Only admin users can view caregiver verification details.",
+      });
     }
 
     const { caregiverId } = req.params;
     const data = await governanceService.getCaregiverVerificationDetails(caregiverId);
-    res.json(data);
+    return res.json(data);
   } catch (error) {
-    console.error("Caregiver details error:", error.message);
-    res.status(400).json({ message: error.message });
+    console.error("Caregiver details error:", error);
+    return res.status(400).json({ message: error.message });
   }
 });
 
 // ADMIN: APPROVE / REJECT caregiver
-// PUT /api/governance/admin/caregiver/:caregiverId/status
 router.put("/admin/caregiver/:caregiverId/status", async (req, res) => {
   try {
     if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Only admin users can verify caregivers." });
+      return res.status(403).json({
+        message: "Forbidden: Only admin users can verify caregivers.",
+      });
     }
 
     const { caregiverId } = req.params;
-    const { newStatus, note } = req.body;
+    const { newStatus, note, badge } = req.body;
 
     if (!newStatus) {
       return res.status(400).json({ message: "newStatus is required." });
@@ -97,45 +102,53 @@ router.put("/admin/caregiver/:caregiverId/status", async (req, res) => {
       caregiverId,
       req.user.user_id,
       newStatus,
-      note || null
+      note || null,
+      badge || null
     );
 
-    res.json({ message: "Caregiver status updated.", result });
+    return res.json({
+      message: "Caregiver status updated.",
+      result,
+    });
   } catch (error) {
-    console.error("Update caregiver status error:", error.message);
-    res.status(400).json({ message: error.message });
+    console.error("Update caregiver status error:", error);
+    return res.status(400).json({ message: error.message });
   }
 });
 
 // ADMIN: LIST COMPLAINTS
-// GET /api/governance/complaints
 router.get("/complaints", async (req, res) => {
   try {
     if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Only admin users can view complaints." });
+      return res.status(403).json({
+        message: "Forbidden: Only admin users can view complaints.",
+      });
     }
 
     const rows = await governanceService.listComplaintsForAdmin();
-    res.json(rows);
+    return res.json(rows);
   } catch (error) {
-    console.error("List complaints error:", error.message);
-    res.status(400).json({ message: error.message });
+    console.error("List complaints error:", error);
+    return res.status(400).json({ message: error.message });
   }
 });
 
 // ADMIN: RESOLVE COMPLAINT
-// PUT /api/governance/resolveComplaint/:complaintId
 router.put("/resolveComplaint/:complaintId", async (req, res) => {
   try {
     const { complaintId } = req.params;
     const { resolutionNote, newStatus } = req.body;
 
     if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Only admin users can resolve complaints." });
+      return res.status(403).json({
+        message: "Forbidden: Only admin users can resolve complaints.",
+      });
     }
 
     if (!resolutionNote || !newStatus) {
-      return res.status(400).json({ message: "Resolution note and newStatus are required." });
+      return res.status(400).json({
+        message: "Resolution note and newStatus are required.",
+      });
     }
 
     const result = await governanceService.resolveComplaint(
@@ -145,10 +158,13 @@ router.put("/resolveComplaint/:complaintId", async (req, res) => {
       newStatus
     );
 
-    res.status(200).json({ message: "Complaint resolved successfully.", result });
+    return res.status(200).json({
+      message: "Complaint resolved successfully.",
+      result,
+    });
   } catch (error) {
-    console.error("Complaint resolution error:", error.message);
-    res.status(400).json({ message: error.message });
+    console.error("Complaint resolution error:", error);
+    return res.status(400).json({ message: error.message });
   }
 });
 
