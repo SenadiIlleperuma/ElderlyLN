@@ -11,17 +11,26 @@ const bookingRouter = require("./routes/booking.route");
 const governanceRouter = require("./routes/governance.route");
 const profileRouter = require("./routes/profile.route");
 const documentsRouter = require("./routes/documents.route");
+const notificationRouter = require("./routes/notification.route");
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-app.use(express.json({ limit: "25mb" })); // allow base64 if needed
+app.use(express.json({ limit: "25mb" }));
 app.use(cors());
 
-app.use((req, res, next) => {
-  console.log("REQ:", req.method, req.url);
-  next();
-});
+// app.use((req, res, next) => {
+//   const start = Date.now();
+
+//   console.log("REQ:", req.method, req.url);
+
+//   res.on("finish", () => {
+//     const duration = Date.now() - start;
+//     console.log(`RES: ${req.method} ${req.url} - ${res.statusCode} - ${duration} ms`); // Log response status and duration
+//   }); 
+
+//   next();
+// });
 
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -36,8 +45,7 @@ app.use("/api/review", reviewRouter);
 app.use("/api/booking", bookingRouter);
 app.use("/api/governance", governanceRouter);
 app.use("/api/profile", profileRouter);
-
-// caregiver document upload routes
+app.use("/api/notifications", notificationRouter);
 app.use("/api/documents", documentsRouter);
 
 app.listen(PORT, "0.0.0.0", () => {
