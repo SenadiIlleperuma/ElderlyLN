@@ -1,14 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  Modal,
-} from "react-native";
+import {View,Text,StyleSheet,Pressable,ScrollView,ActivityIndicator,Alert,Modal,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
@@ -16,6 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { theme } from "../../constants/theme";
 import { api } from "../../api/api";
 
+// Lagunage options shown in the admin header
 const LANGUAGES = [
   { code: "en", label: "English", short: "EN" },
   { code: "si", label: "සිංහල", short: "SI" },
@@ -34,41 +26,46 @@ export default function AdminHomeScreen({ navigation }: any) {
     urgentUnresolved: 0,
   });
 
+  // Determine the current language for display in the header
   const currentLanguage =
     LANGUAGES.find((lang) => lang.code === i18n.language) || LANGUAGES[0];
 
   const fetchStats = async () => {
     try {
       setLoading(true);
+      // Fetch admin stats from the backend
       const res = await api.get("/governance/admin/stats");
       setStats(res.data);
     } catch (e: any) {
       console.log("Admin stats error:", e?.response?.data || e?.message);
-      Alert.alert("Error", e?.response?.data?.message || "Failed to load admin stats");
+      Alert.alert(t("error_title"), e?.response?.data?.message || t("failed_load_admin_stats"));
     } finally {
       setLoading(false);
     }
   };
-
+  
   useEffect(() => {
     fetchStats();
   }, []);
 
+  // Change the app language and save the preference
   const handleChangeLanguage = async (langCode: string) => {
     try {
       await i18n.changeLanguage(langCode);
-      await AsyncStorage.setItem("app_language", langCode);
+      await AsyncStorage.setItem("app_language", langCode); // store the selected language for future app launches
       setLanguageModalVisible(false);
     } catch (error) {
       console.log("Language change error:", error);
     }
   };
 
+  
   const onLogout = async () => {
     await AsyncStorage.multiRemove(["token", "user", "role", "session"]);
     navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
   };
 
+  // Split stats into individual variables for easier use in the UI
   const totalUsers = stats.totalUsers;
   const totalBookings = stats.totalBookings;
   const pendingReviews = stats.pendingReviews;
@@ -92,7 +89,7 @@ export default function AdminHomeScreen({ navigation }: any) {
             </Pressable>
           </View>
         </View>
-
+        {/* // Dropdown modal for language selection */}
         <Modal
           transparent
           visible={languageModalVisible}
@@ -137,7 +134,7 @@ export default function AdminHomeScreen({ navigation }: any) {
 
             <View style={styles.deltaPill}>
               <Ionicons name="trending-up-outline" size={14} color="#fff" />
-              <Text style={styles.deltaText}>LIVE</Text>
+              <Text style={styles.deltaText}>{t("live")}</Text>
             </View>
           </View>
 
@@ -151,7 +148,7 @@ export default function AdminHomeScreen({ navigation }: any) {
 
             <View style={[styles.deltaPill, { backgroundColor: "rgba(34,197,94,0.25)" }]}>
               <Ionicons name="pulse-outline" size={14} color="#22c55e" />
-              <Text style={[styles.deltaText, { color: "#22c55e" }]}>LIVE</Text>
+              <Text style={[styles.deltaText, { color: "#22c55e" }]}>{t("live")}</Text>
             </View>
           </View>
         </View>
@@ -162,6 +159,7 @@ export default function AdminHomeScreen({ navigation }: any) {
             <Text style={styles.sectionTitle}>{t("management_center")}</Text>
           </View>
 
+          {/* // Open the admin hub to manage verification requests and complaints */}
           <Pressable style={styles.manageItem} onPress={() => navigation?.navigate?.("AdminHub")}>
             <View style={styles.manageIcon}>
               <Ionicons name="document-text-outline" size={22} color="#fff" />
@@ -183,7 +181,7 @@ export default function AdminHomeScreen({ navigation }: any) {
           </View>
 
           <Text style={styles.urgentText}>{t("urgent_issues_sub")}</Text>
-
+          {/* // Quick shortcut to the admin hub for urgent unresolved issues */}
           <Pressable style={styles.urgentBtn} onPress={() => navigation?.navigate?.("AdminHub")}>
             <Text style={styles.urgentBtnText}>{t("go_to_hub")}</Text>
           </Pressable>

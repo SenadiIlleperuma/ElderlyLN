@@ -4,19 +4,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
-
-import { AuthStackParamList, BookingRow } from "../../RootNavigator";
+import { AuthStackParamList } from "../../RootNavigator";
 import { theme } from "../../constants/theme";
 import { api } from "../../api/api";
-
 type Props = NativeStackScreenProps<AuthStackParamList, "RequestDetails">;
 
+// Utility functions to clean and format booking data for display
 function cleanText(v: any) {
   const s = String(v ?? "").trim();
   if (!s || s === "not_set" || s === "null" || s === "undefined") return "";
   return s;
 }
-
+// Format a date safely for diaplay in request details
 function prettyDate(iso?: string, dashValue: string = "—") {
   if (!iso) return dashValue;
   const d = new Date(iso);
@@ -24,9 +23,29 @@ function prettyDate(iso?: string, dashValue: string = "—") {
   return d.toLocaleString();
 }
 
+// Convert an array of care needs into a readable string for display
 function needsToText(needs?: string[] | null) {
   if (!needs || !Array.isArray(needs) || needs.length === 0) return "";
   return needs.join(", ");
+}
+// Normalize the time period so salary formatting is easier
+function normalizeTimePeriod(value: any) {
+  return String(value || "").trim().toLowerCase();
+}
+
+// Format the expected rate based on the selected work period
+function formatSalaryByPeriod(rate: any, timePeriod: any) {
+  const amount = Number(rate || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return "—";
+
+  const p = normalizeTimePeriod(timePeriod);
+
+  if (p.includes("hour")) return `Rs. ${amount} / hour`;
+  if (p.includes("half")) return `Rs. ${amount} / half-day`;
+  if (p.includes("full")) return `Rs. ${amount} / day`;
+  if (p.includes("live")) return `Rs. ${amount} / month`;
+
+  return `Rs. ${amount}`;
 }
 
 export default function RequestDetailsScreen({ navigation, route }: Props) {
@@ -45,10 +64,11 @@ export default function RequestDetailsScreen({ navigation, route }: Props) {
 
   const salaryText =
     booking.caregiver_expected_rate != null && String(booking.caregiver_expected_rate).trim() !== ""
-      ? t("salary_lkr_per_hr", { v: booking.caregiver_expected_rate })
+      ? formatSalaryByPeriod(booking.caregiver_expected_rate, booking.caregiver_time_period)
       : t("dash_value");
 
-  const requirements = useMemo(() => {
+// Build a simple list of request requirements from booking details
+      const requirements = useMemo(() => {
     const req: string[] = [];
     req.push(t("requirement_background_check"));
 
@@ -61,12 +81,15 @@ export default function RequestDetailsScreen({ navigation, route }: Props) {
     return req;
   }, [booking, t]);
 
+  // Only requested booking can be accepted or declined 
   const canAcceptDecline = status === "Requested";
   const canComplete = status === "Accepted";
 
+  // Update the booking status
   const updateStatus = async (newStatus: "Accepted" | "Declined" | "Completed") => {
     try {
       setSaving(true);
+      // Send the selected booking status update to the backend API
       await api.put(`/booking/status/${booking.booking_id}`, { status: newStatus });
       Alert.alert(t("success_title"), t("booking_marked_as", { status: newStatus }));
       navigation.goBack();
@@ -78,6 +101,7 @@ export default function RequestDetailsScreen({ navigation, route }: Props) {
     }
   };
 
+  // Ask for confirmation before updating the booking status 
   const confirmAction = (newStatus: "Accepted" | "Declined" | "Completed") => {
     Alert.alert(t("confirm_request_action_title", { status: newStatus }), t("are_you_sure"), [
       { text: t("cancel"), style: "cancel" },
@@ -142,6 +166,7 @@ export default function RequestDetailsScreen({ navigation, route }: Props) {
           <View style={{ marginTop: 18 }}>
             <Text style={styles.sectionTitle}>{t("requirements")}</Text>
             <View style={{ marginTop: 10, gap: 10 }}>
+              {/* Show each request requirement as a seperate list item  */}
               {requirements.map((r, idx) => (
                 <View key={`${r}-${idx}`} style={styles.reqRow}>
                   <View style={styles.bullet} />
@@ -153,9 +178,15 @@ export default function RequestDetailsScreen({ navigation, route }: Props) {
 
           <View style={{ marginTop: 18 }}>
             <Text style={styles.sectionTitle}>{t("request_meta")}</Text>
-            <Text style={styles.metaLine}>{t("status")}: {status}</Text>
-            <Text style={styles.metaLine}>{t("service_date")}: {prettyDate(booking.service_date, t("dash_value"))}</Text>
-            <Text style={styles.metaLine}>{t("requested")}: {prettyDate(booking.requested_at, t("dash_value"))}</Text>
+            <Text style={styles.metaLine}>
+              {t("status")}: {status}
+            </Text>
+            <Text style={styles.metaLine}>
+              {t("service_date")}: {prettyDate(booking.service_date, t("dash_value"))}
+            </Text>
+            <Text style={styles.metaLine}>
+              {t("requested")}: {prettyDate(booking.requested_at, t("dash_value"))}
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -172,11 +203,12 @@ export default function RequestDetailsScreen({ navigation, route }: Props) {
           <>
             {canAcceptDecline && (
               <>
+              {/* Decline the booking request */}
                 <Pressable style={[styles.actionBtn, styles.declineBtn]} onPress={() => confirmAction("Declined")}>
                   <Ionicons name="close" size={18} color="#EF4444" />
                   <Text style={[styles.actionText, { color: "#EF4444" }]}>{t("decline")}</Text>
                 </Pressable>
-
+              {/* Accept the booking request */}
                 <Pressable style={[styles.actionBtn, styles.acceptBtn]} onPress={() => confirmAction("Accepted")}>
                   <Ionicons name="checkmark" size={18} color="#fff" />
                   <Text style={[styles.actionText, { color: "#fff" }]}>{t("accept")}</Text>
@@ -185,6 +217,7 @@ export default function RequestDetailsScreen({ navigation, route }: Props) {
             )}
 
             {canComplete && (
+              // Mark the accepted booking as completed
               <Pressable style={[styles.actionBtn, styles.acceptBtn, { flex: 1 }]} onPress={() => confirmAction("Completed")}>
                 <Ionicons name="checkmark-done" size={18} color="#fff" />
                 <Text style={[styles.actionText, { color: "#fff" }]}>{t("mark_completed")}</Text>

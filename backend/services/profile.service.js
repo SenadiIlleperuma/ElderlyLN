@@ -2,6 +2,7 @@ const path = require("path");
 const db = require("../db");
 const { supabase } = require("../utils/supabaseClient");
 
+// Normalizes status text.
 function normalizeStatus(value) {
   return String(value || "")
     .trim()
@@ -9,6 +10,7 @@ function normalizeStatus(value) {
     .replace(/\s+/g, "_");
 }
 
+// Gets family profile.
 async function getFamilyByUserId(userId) {
   const q = `
     SELECT
@@ -33,6 +35,7 @@ async function getFamilyByUserId(userId) {
   return r.rows[0];
 }
 
+// Gets caregiver profile.
 async function getCaregiverByUserId(userId) {
   const q = `
     SELECT
@@ -73,6 +76,7 @@ async function getCaregiverByUserId(userId) {
   return row;
 }
 
+// Gets public caregiver profile.
 async function getCaregiverPublicProfileById(caregiverId) {
   const q = `
     SELECT
@@ -113,6 +117,7 @@ async function getMyFamilyProfile(userId) {
   return await getFamilyByUserId(userId);
 }
 
+// Updates family profile + user.
 async function updateMyFamilyProfile(userId, payload) {
   const {
     full_name,
@@ -156,6 +161,7 @@ async function getMyCaregiverProfile(userId) {
   return await getCaregiverByUserId(userId);
 }
 
+// Updates caregiver profile + user.
 async function updateMyCaregiverProfile(userId, payload) {
   const {
     full_name,
@@ -217,6 +223,7 @@ async function updateMyCaregiverProfile(userId, payload) {
   return await getCaregiverByUserId(userId);
 }
 
+// Uploads caregiver profile image.
 async function saveMyCaregiverProfileImage(userId, file) {
   if (!file) {
     throw new Error("Profile image file is required.");
@@ -275,6 +282,7 @@ async function saveMyCaregiverProfileImage(userId, file) {
   return row;
 }
 
+// Removes caregiver profile image.
 async function removeMyCaregiverProfileImage(userId) {
   const q = `
     UPDATE caregiver
@@ -295,6 +303,7 @@ async function removeMyCaregiverProfileImage(userId) {
   return row;
 }
 
+// Gets caregiver id from user id.
 async function getCaregiverIdByUserId(userId) {
   const q = `SELECT caregiver_id FROM caregiver WHERE user_fk = $1 LIMIT 1`;
   const r = await db.query(q, [userId]);
@@ -302,6 +311,7 @@ async function getCaregiverIdByUserId(userId) {
   return r.rows[0].caregiver_id;
 }
 
+// Gets current verification status.
 async function getMyCaregiverVerificationStatus(userId) {
   const q = `
     SELECT caregiver_id, profile_status, verification_badges
@@ -318,6 +328,7 @@ async function getMyCaregiverVerificationStatus(userId) {
   return row;
 }
 
+// Lists caregiver docs.
 async function listMyCaregiverDocuments(userId) {
   const caregiverId = await getCaregiverIdByUserId(userId);
 
@@ -344,6 +355,7 @@ async function listMyCaregiverDocuments(userId) {
   }));
 }
 
+// Saves caregiver doc metadata.
 async function addMyCaregiverDocument(userId, doc) {
   const caregiverId = await getCaregiverIdByUserId(userId);
 
@@ -381,6 +393,7 @@ async function addMyCaregiverDocument(userId, doc) {
   return row;
 }
 
+// Submits caregiver for verification.
 async function submitMyCaregiverForVerification(userId) {
   const caregiverId = await getCaregiverIdByUserId(userId);
 
@@ -414,6 +427,7 @@ async function submitMyCaregiverForVerification(userId) {
   const r = await db.query(q, [caregiverId]);
   const types = [...new Set(r.rows.map((x) => String(x.document_type || "").toUpperCase().trim()))];
 
+  // Require NIC + police.
   if (!types.includes("NIC") || !types.includes("POLICE")) {
     throw new Error("Please upload NIC and Police Clearance before submitting for verification.");
   }
@@ -450,6 +464,7 @@ async function submitMyCaregiverForVerification(userId) {
   }
 }
 
+// Soft deactivates account.
 async function deactivateMyAccount(userId) {
   const q = `
     UPDATE "user"
@@ -462,6 +477,7 @@ async function deactivateMyAccount(userId) {
   return r.rows[0];
 }
 
+// Reactivates account.
 async function reactivateMyAccount(userId) {
   const q = `
     UPDATE "user"
@@ -474,6 +490,7 @@ async function reactivateMyAccount(userId) {
   return r.rows[0];
 }
 
+// Permanently deletes account.
 async function deleteMyAccountPermanently(userId) {
   const q = `DELETE FROM "user" WHERE user_id = $1 RETURNING user_id`;
   const r = await db.query(q, [userId]);

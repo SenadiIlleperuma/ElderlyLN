@@ -1,6 +1,7 @@
 const db = require("../db");
 const notificationService = require("./notification.service");
 
+// Gets family/caregiver profile id
 const getProfileId = async (userId, role) => {
   const table = role === "family" ? "family" : "caregiver";
   const idColumn = role === "family" ? "family_id" : "caregiver_id";
@@ -15,6 +16,7 @@ const getProfileId = async (userId, role) => {
   return result.rows[0][idColumn];
 };
 
+// Creates booking request
 const createBooking = async (userId, caregiverId, serviceDate, notes) => {
   const familyId = await getProfileId(userId, "family");
 
@@ -55,7 +57,7 @@ const createBooking = async (userId, caregiverId, serviceDate, notes) => {
 
   const booking = result.rows[0];
 
-  // Notify caregiver about new booking request
+  // Notify caregiver
   if (caregiverUserId) {
     await notificationService.createNotification({
       userId: caregiverUserId,
@@ -69,7 +71,7 @@ const createBooking = async (userId, caregiverId, serviceDate, notes) => {
 
   return booking;
 };
-
+// Updates booking status with rules
 const updateBookingStatus = async ({
   bookingId,
   newStatus,
@@ -113,6 +115,7 @@ const updateBookingStatus = async ({
     throw new Error("Booking not found!");
   }
 
+  // Ownership check.
   if (actorRole === "family" && bookingDetails.family_user_fk !== actorUserId) {
     throw new Error("Forbidden: This booking is not yours (family).");
   }
@@ -123,11 +126,13 @@ const updateBookingStatus = async ({
 
   const currentStatus = bookingDetails.booking_status;
 
+  // Block final states.
   const FINAL = ["Completed", "Declined", "Cancelled"];
   if (FINAL.includes(currentStatus)) {
     throw new Error(`This booking is already ${currentStatus} and cannot be changed.`);
   }
 
+  // Allowed transitions.
   const familyAllowedTransitions = {
     Requested: ["Cancelled"],
     Accepted: ["Cancelled"],
@@ -162,7 +167,7 @@ const updateBookingStatus = async ({
   const familyUserId = bookingDetails.family_user_fk;
   const caregiverUserId = bookingDetails.caregiver_user_fk;
 
-  // Notifications based on new status
+  // Status notification
   if (newStatus === "Accepted" && familyUserId) {
     await notificationService.createNotification({
       userId: familyUserId,
@@ -223,6 +228,7 @@ const updateBookingStatus = async ({
   return updatedBooking;
 };
 
+// Gets bookings for current user
 const getBookingsByUser = async (userId, userRole) => {
   const isFamily = userRole === "family";
   const profileId = await getProfileId(userId, isFamily ? "family" : "caregiver");

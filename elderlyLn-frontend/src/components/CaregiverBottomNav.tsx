@@ -10,8 +10,10 @@ type Props = {
 };
 
 export default function CaregiverBottomNav({ active, navigation }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isTamil = i18n.language === "ta";
 
+  // Reusable bottom navigation item for caregiver screens
   const Item = ({
     tab,
     icon,
@@ -22,18 +24,29 @@ export default function CaregiverBottomNav({ active, navigation }: Props) {
     label: string;
   }) => {
     const isActive = active === tab;
+    const color = isActive ? theme.colors.primary : "#94A3B8";
 
     return (
       <Pressable
         style={styles.item}
         onPress={() => {
+          // Navigates to the matching caregiver screen based on the selected tab
           if (tab === "home") navigation.navigate("CaregiverHome");
           if (tab === "alerts") navigation.navigate("CaregiverAlerts");
           if (tab === "profile") navigation.navigate("CaregiverEditProfile");
         }}
       >
-        <Ionicons name={icon} size={22} color={isActive ? theme.colors.primary : "#94A3B8"} />
-        <Text style={[styles.label, { color: isActive ? theme.colors.primary : "#94A3B8" }]}>
+        <Ionicons name={icon} size={22} color={color} />
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+          style={[
+            styles.label,
+            isTamil && styles.labelTamil,
+            { color }
+          ]}
+        >
           {label}
         </Text>
       </Pressable>
@@ -64,6 +77,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     paddingBottom: 10
   },
-  item: { alignItems: "center", justifyContent: "center", gap: 4 },
-  label: { fontSize: 11, fontWeight: "900" }
+  item: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 4
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  labelTamil: {
+    fontSize: 10
+  }
 });

@@ -4,7 +4,7 @@ const authService = require("../services/auth.service");
 const db = require("../db");
 const { authenticateToken } = require("../middleware/auth.middleware");
 
-// Helpers
+// Utility functions for validation
 const isValidEmail = (email) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").toLowerCase());
 
@@ -13,6 +13,7 @@ const normalizePhoneLK = (phone) =>
 
 const isValidPhoneLK = (phone) => /^[0-9]{10}$/.test(phone);
 
+// Validate password strength
 const validatePassword = (pw) => {
   if (!pw || pw.length < 8) return "Password must be at least 8 characters.";
   if (!/[A-Z]/.test(pw)) return "Password must include at least 1 uppercase letter.";
@@ -26,6 +27,7 @@ router.post("/register", async (req, res) => {
   try {
     const { role, email, password, phone_no, full_name, district } = req.body;
 
+    // Ensure all required fields are present
     if (!role || !email || !password || !phone_no || !full_name || !district) {
       return res.status(400).json({ message: "Missing required fields." });
     }
@@ -38,6 +40,7 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Invalid email address." });
     }
 
+    // Normalize and validate phone number
     const phone = normalizePhoneLK(phone_no);
     if (!isValidPhoneLK(phone)) {
       return res.status(400).json({ message: "Invalid phone number. Use 10 digits (e.g., 07XXXXXXXX)." });
@@ -71,7 +74,7 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-
+    // Login requires both email and password
     if (!email || !password) return res.status(400).json({ message: "Email and password are required." });
     if (!isValidEmail(email)) return res.status(400).json({ message: "Invalid email address." });
 
@@ -90,7 +93,7 @@ router.post("/login", async (req, res) => {
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id;
-
+    // Fetch shared account data from "user" table
     const u = await db.query(
       `SELECT user_id, email, role, phone_no
        FROM "user"

@@ -19,18 +19,17 @@ const PORT = process.env.PORT || 5001;
 app.use(express.json({ limit: "25mb" }));
 app.use(cors());
 
-// app.use((req, res, next) => {
-//   const start = Date.now();
+/**app.use((req, res, next) => {
+  const start = Date.now();
 
-//   console.log("REQ:", req.method, req.url);
+  console.log("REQ:", req.method, req.url);
 
-//   res.on("finish", () => {
-//     const duration = Date.now() - start;
-//     console.log(`RES: ${req.method} ${req.url} - ${res.statusCode} - ${duration} ms`); // Log response status and duration
-//   }); 
-
-//   next();
-// });
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    console.log(`RES: ${req.method} ${req.url} - ${res.statusCode} - ${duration} ms`); // Log response status and duration
+  }); 
+  next();
+ }); **/
 
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -39,6 +38,7 @@ app.get("/api/test", (req, res) => {
   res.status(200).json({ message: "Backend is reachable" });
 });
 
+// Main routes
 app.use("/api/auth", authRouter);
 app.use("/api/matching", matchingRouter);
 app.use("/api/review", reviewRouter);
@@ -48,6 +48,7 @@ app.use("/api/profile", profileRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/documents", documentsRouter);
 
+// Start server
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`ElderlyLN Backend running on port ${PORT}`);
   console.log(`Test API at: http://localhost:${PORT}/api/test`);

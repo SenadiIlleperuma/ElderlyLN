@@ -1,13 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
+// Storage functions for managing async storage
 export async function setItem(key: string, value: string) {
   await AsyncStorage.setItem(key, value);
 }
-
+// Get an item from async storage
 export async function getItem(key: string) {
   return AsyncStorage.getItem(key);
 }
 
+// Remove an item from async storage
 export async function removeItem(key: string) {
   await AsyncStorage.removeItem(key);
 }
@@ -18,12 +19,13 @@ export type StoredUser = {
   role: "family" | "caregiver" | "admin";
 };
 
+// User-specific storage functions
 const USER_KEY = "APP_USER";
 
 export async function saveUser(user: StoredUser) {
   await setItem(USER_KEY, JSON.stringify(user));
 }
-
+// Retrieve and safely parse the user data
 export async function getUser(): Promise<StoredUser | null> {
   const raw = await getItem(USER_KEY);
   if (!raw) return null;

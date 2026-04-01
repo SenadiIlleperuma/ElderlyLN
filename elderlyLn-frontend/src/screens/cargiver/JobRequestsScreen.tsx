@@ -1,36 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  FlatList,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
-} from "react-native";
+import { View,Text,StyleSheet, Pressable, FlatList,ActivityIndicator,RefreshControl,Alert,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
-
 import { AuthStackParamList, BookingRow } from "../../RootNavigator";
 import { theme } from "../../constants/theme";
 import { api } from "../../api/api";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "JobRequests">;
 
+// Utility functions
 function cleanText(v: any) {
   const s = String(v ?? "").trim();
   if (!s || s === "not_set" || s === "null" || s === "undefined") return "";
   return s;
 }
-
+// Check whether the service date is today
 function isToday(d: Date) {
   const now = new Date();
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
 
+// Check whether the service date is tomorrow
 function isTomorrow(d: Date) {
   const now = new Date();
   const t = new Date(now);
@@ -38,6 +30,7 @@ function isTomorrow(d: Date) {
   return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
 }
 
+// Create a stable demo match percentage from the booking id
 function stableMatchPercent(id: string) {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
@@ -51,6 +44,7 @@ export default function JobRequestsScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [rows, setRows] = useState<BookingRow[]>([]);
 
+  // Convert the service date to a user-friendly label
   const dateLabel = (serviceDate: string) => {
     const d = new Date(serviceDate);
     if (Number.isNaN(d.getTime())) return t("dash_value");
@@ -59,11 +53,14 @@ export default function JobRequestsScreen({ navigation }: Props) {
     return d.toLocaleDateString();
   };
 
+  // Load caregiver booking requests from the backend
   const fetchRequests = useCallback(async () => {
     try {
+      // Request current booking data for the caregiver
       const res = await api.get("/booking/myBookings");
       const data = Array.isArray(res.data) ? res.data : [];
 
+      // Map the API response to the expected BookingRow structure
       const mapped: BookingRow[] = data.map((r: any) => ({
         booking_id: String(r.booking_id ?? ""),
         family_fk: String(r.family_fk ?? ""),
@@ -88,10 +85,11 @@ export default function JobRequestsScreen({ navigation }: Props) {
       setRows(mapped);
     } catch (err: any) {
       console.log("Fetch job requests error:", err?.response?.data || err?.message);
-      Alert.alert(t("error_title"), err?.response?.data?.message || t("failed_load_requests"));
+      Alert.alert(t("error_title"), err?.response?.data?.message || t("failed_load_bookings"));
     }
   }, [t]);
 
+  // Load booking requests when the screen opens
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -100,23 +98,28 @@ export default function JobRequestsScreen({ navigation }: Props) {
     })();
   }, [fetchRequests]);
 
+  // Handle pull-to-refresh action
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchRequests();
     setRefreshing(false);
   }, [fetchRequests]);
 
+  // Calculate the number of requested bookings for the notification badge
   const requestedCount = useMemo(() => rows.filter((r) => r.booking_status === "Requested").length, [rows]);
 
-  const openDetails = (booking: BookingRow) => {
+  // Open the selected booking request in the details screen
+  const openDetails = (booking: BookingRow) => { 
     navigation.navigate("RequestDetails", { booking });
   };
 
+  // Render a single booking request card in the list
   const renderItem = ({ item }: { item: BookingRow }) => {
     const name = cleanText(item.family_name) || t("family_generic");
     const district = cleanText(item.family_district);
     const serviceType = cleanText(item.caregiver_service_type);
     const label = dateLabel(item.service_date);
+    // Show a consistent demo match score for the request card
     const match = stableMatchPercent(item.booking_id);
 
     return (
@@ -175,12 +178,12 @@ export default function JobRequestsScreen({ navigation }: Props) {
           {requestedCount > 0 && <View style={styles.dot} />}
         </Pressable>
       </View>
-
+{/* Display a banner with information about new matching requests */}
       <View style={styles.banner}>
         <Ionicons name="sparkles-outline" size={18} color="#A64B00" />
         <Text style={styles.bannerText}>
           {requestedCount > 0
-            ? t("new_matching_requests_banner", { count: requestedCount })
+            ? t("new_matching_requests_banner", { count: requestedCount, plural: requestedCount > 1 ? "s" : "" })
             : t("no_new_requests")}
         </Text>
       </View>
@@ -189,10 +192,11 @@ export default function JobRequestsScreen({ navigation }: Props) {
         <View style={styles.center}>
           <ActivityIndicator />
           <Text style={{ marginTop: 10, color: theme.colors.muted, fontWeight: "700" }}>
-            {t("loading_requests")}
+            {t("loading")}
           </Text>
         </View>
       ) : (
+        // Show all booking requests
         <FlatList
           contentContainerStyle={{ padding: theme.spacing.xl, paddingBottom: 24 }}
           data={rows}
@@ -201,8 +205,8 @@ export default function JobRequestsScreen({ navigation }: Props) {
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <Ionicons name="clipboard-outline" size={28} color={theme.colors.muted} />
-              <Text style={styles.emptyTitle}>{t("no_requests_yet")}</Text>
-              <Text style={styles.emptySub}>{t("no_requests_yet_sub")}</Text>
+              <Text style={styles.emptyTitle}>{t("no_new_requests")}</Text>
+              <Text style={styles.emptySub}>{t("no_upcoming_shifts_sub")}</Text>
             </View>
           }
           renderItem={renderItem}

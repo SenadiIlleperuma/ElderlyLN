@@ -25,7 +25,7 @@ import AdminHomeScreen from "./screens/admin/AdminHomeScreen";
 import AdminHubScreen from "./screens/admin/AdminHubScreen";
 import VerifyCaregiverScreen from "./screens/admin/VerifyCaregiverScreen";
 
-
+// Defines a structured care request model used in caregiver request flows
 export type CareRequest = {
   id: string;
   familyName: string;
@@ -39,6 +39,7 @@ export type CareRequest = {
   requirements: string[];
 };
 
+// Defines the shared booking object shape used across multiple screens
 export type BookingRow = {
   booking_id: string;
   family_fk: string;
@@ -58,7 +59,7 @@ export type BookingRow = {
   caregiver_expected_rate?: number | null;
 };
 
-
+// Defines the payload shape used in caregiver verification-related flows
 export type VerifyCaregiverPayload = {
   caregiver: {
     id: string;
@@ -70,6 +71,7 @@ export type VerifyCaregiverPayload = {
   };
 };
 
+// Defines the caregiver match model used in family search and matching screens
 export type MatchCaregiver = {
   caregiver_id: number;
   user_fk: number;
@@ -86,7 +88,7 @@ export type MatchCaregiver = {
   verification_badges?: string[];
   match_score?: number;
 };
-
+// Defines the parameter list for the authentication stack
 export type AuthStackParamList = {
   Splash: undefined;
   LanguageSelect: undefined;
@@ -150,7 +152,7 @@ export type AuthStackParamList = {
   // Admin
   AdminHome: undefined;
   AdminHub: undefined;
-VerifyCaregiver: { caregiverId: string };};
+  VerifyCaregiver: { caregiverId: string };};
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 

@@ -7,6 +7,7 @@ router.get("/me", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id;
 
+    // Returns both the list and unread counter
     const notifications =
       await notificationService.getNotificationsForUser(userId);
 
@@ -31,6 +32,7 @@ router.patch("/:id/read", authenticateToken, async (req, res) => {
     const userId = req.user.user_id;
     const notificationId = req.params.id;
 
+    // Checks if the notification belongs to the user and marks it as read
     const updated = await notificationService.markAsRead(
       notificationId,
       userId
@@ -81,6 +83,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
     const userId = req.user.user_id;
     const notificationId = req.params.id;
 
+    // Delete the notification if it belongs to the user
     const deleted = await notificationService.deleteNotification(
       notificationId,
       userId

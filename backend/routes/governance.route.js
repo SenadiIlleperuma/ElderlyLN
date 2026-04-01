@@ -4,6 +4,7 @@ const governanceService = require("../services/governance.service");
 const { authenticateToken } = require("../middleware/auth.middleware");
 
 router.use(authenticateToken);
+// Governance routes cover complaints, admin monitoring, and caregiver verification actions.
 
 // FAMILY/CAREGIVER: FILE COMPLAINT
 router.post("/fileComplaint", async (req, res) => {
@@ -15,7 +16,7 @@ router.post("/fileComplaint", async (req, res) => {
         message: "Booking ID and reason are required to file a complaint.",
       });
     }
-
+    // Only family members and caregivers can file complaints
     const result = await governanceService.fileComplaint(
       req.user.user_id,
       bookingId,
@@ -33,6 +34,7 @@ router.post("/fileComplaint", async (req, res) => {
 // ADMIN: DASHBOARD STATS
 router.get("/admin/stats", async (req, res) => {
   try {
+    // Only admin users can access dashboard stats
     if (req.user.role !== "admin") {
       return res.status(403).json({
         message: "Forbidden: Only admin users can view admin stats.",
@@ -50,6 +52,7 @@ router.get("/admin/stats", async (req, res) => {
 // ADMIN: VERIFICATION QUEUE
 router.get("/admin/verificationQueue", async (req, res) => {
   try {
+    // Returns caregiver waiting for verification
     if (req.user.role !== "admin") {
       return res.status(403).json({
         message: "Forbidden: Only admin users can view verification queue.",
@@ -67,6 +70,7 @@ router.get("/admin/verificationQueue", async (req, res) => {
 // ADMIN: CAREGIVER VERIFICATION DETAILS
 router.get("/admin/caregiver/:caregiverId", async (req, res) => {
   try {
+    //  Loads caregiver verification details
     if (req.user.role !== "admin") {
       return res.status(403).json({
         message: "Forbidden: Only admin users can view caregiver verification details.",
@@ -85,6 +89,7 @@ router.get("/admin/caregiver/:caregiverId", async (req, res) => {
 // ADMIN: APPROVE / REJECT caregiver
 router.put("/admin/caregiver/:caregiverId/status", async (req, res) => {
   try {
+    // Only admin can approve or reject caregivers
     if (req.user.role !== "admin") {
       return res.status(403).json({
         message: "Forbidden: Only admin users can verify caregivers.",
@@ -119,6 +124,7 @@ router.put("/admin/caregiver/:caregiverId/status", async (req, res) => {
 // ADMIN: LIST COMPLAINTS
 router.get("/complaints", async (req, res) => {
   try {
+    // Only admin can monitor all complaints
     if (req.user.role !== "admin") {
       return res.status(403).json({
         message: "Forbidden: Only admin users can view complaints.",

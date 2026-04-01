@@ -10,11 +10,12 @@ type Props = NativeStackScreenProps<AuthStackParamList, "Splash">;
 export default function SplashScreen({ navigation }: Props) {
   const { t } = useTranslation();
 
+  // Animated values for floating logo and sliding loader bar
   const floatY = useRef(new Animated.Value(0)).current;
-
   const barX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Floating animation for the logo
     const floatAnim = Animated.loop(
       Animated.sequence([
         Animated.timing(floatY, {
@@ -32,7 +33,7 @@ export default function SplashScreen({ navigation }: Props) {
       ])
     );
 
-    // Sliding loader bar
+    // Sliding animation for the loader bar
     const barAnim = Animated.loop(
       Animated.sequence([
         Animated.timing(barX, {
@@ -53,10 +54,12 @@ export default function SplashScreen({ navigation }: Props) {
     floatAnim.start();
     barAnim.start();
 
+    // Move to language selection after 1.5 seconds
     const timer = setTimeout(() => {
       navigation.replace("LanguageSelect");
    }, 1500);
 
+   // Cleanup animations and timer on unmount
     return () => {
       clearTimeout(timer);
       floatAnim.stop();
@@ -64,6 +67,7 @@ export default function SplashScreen({ navigation }: Props) {
     };
   }, [floatY, barX]);
 
+  //Convert the loader animation value into horizontal movement
   const barTranslateX = barX.interpolate({
     inputRange: [0, 1],
     outputRange: [-34, 90] 

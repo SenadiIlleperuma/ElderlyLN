@@ -4,7 +4,7 @@ import joblib
 import pandas as pd
 import numpy as np
 
-
+# Safely transforms categorical values.
 def safe_transform(le, value):
     value = "None" if value is None else str(value).strip()
     if value == "":
@@ -14,6 +14,7 @@ def safe_transform(le, value):
     return int(le.transform([value])[0])
 
 
+# Safely converts to int.
 def safe_int(value, default=0):
     if value is None:
         return default
@@ -27,6 +28,7 @@ def safe_int(value, default=0):
         return default
 
 
+# Safely converts to float.
 def safe_float(value, default=0.0):
     if value is None:
         return default
@@ -40,6 +42,7 @@ def safe_float(value, default=0.0):
         return default
 
 
+# Safely converts to string.
 def safe_str(value, default="None"):
     if value is None:
         return default
@@ -47,6 +50,7 @@ def safe_str(value, default="None"):
     return value if value else default
 
 
+# Gets first language only.
 def first_language(val, default="Sinhala"):
     if val is None:
         return default
@@ -67,6 +71,7 @@ def first_language(val, default="Sinhala"):
     return s
 
 
+# Converts value into list.
 def to_list(val):
     if val is None:
         return []
@@ -86,6 +91,7 @@ def to_list(val):
     return [s]
 
 
+# Replaces empty/anywhere family values.
 def normalize_family_value(value, fallback):
     if value is None:
         return fallback
@@ -97,6 +103,7 @@ def normalize_family_value(value, fallback):
     return s
 
 
+# Normalizes caregiver status.
 def normalize_profile_status(status):
     s = safe_str(status, "").upper().replace(" ", "_")
     if s == "VERIFIED":
@@ -108,6 +115,7 @@ def normalize_profile_status(status):
     return s or "UNKNOWN"
 
 
+# Experience score boost.
 def experience_score(years_exp):
     if years_exp >= 5:
         return 99
@@ -124,6 +132,7 @@ def experience_score(years_exp):
     return 65
 
 
+# Status bonus/penalty.
 def status_bonus(profile_status):
     if profile_status == "VERIFIED":
         return 2
@@ -134,12 +143,14 @@ def status_bonus(profile_status):
     return 0
 
 
+# Rating bonus.
 def rating_bonus(rating):
     if rating >= 4.5:
         return 1
     return 0
 
 
+# ML score adjustment.
 def get_ml_adjustment(score):
     pct = int(round(float(score) * 100))
     if pct >= 90:
@@ -151,6 +162,7 @@ def get_ml_adjustment(score):
     return -3
 
 
+# Main prediction function.
 def predict_matches(payload, model_path):
     caregivers = payload.get("caregivers", [])
     family = payload.get("familyRequirements", {})
@@ -161,6 +173,7 @@ def predict_matches(payload, model_path):
     scaler = bundle["scaler"]
     feature_names = bundle["feature_names"]
 
+    # Expected model columns.
     categorical_cols = [
         "Gender",
         "District",
@@ -198,6 +211,7 @@ def predict_matches(payload, model_path):
 
     X = pd.DataFrame(rows)
 
+    # Encode categorical values.
     for col in categorical_cols:
         le = encoders.get(col)
         if le is None:
@@ -211,6 +225,7 @@ def predict_matches(payload, model_path):
 
     X = X[feature_names]
 
+    # Get prediction scores.
     if hasattr(model, "predict_proba"):
         proba = model.predict_proba(X)
         classes_list = list(model.classes_)
@@ -235,6 +250,7 @@ def predict_matches(payload, model_path):
         rating = safe_float(cg.get("rating"), 0.0)
         profile_status = normalize_profile_status(cg.get("profile_status"))
 
+        # Final match calculation.
         base = experience_score(years_exp)
         final_match = base + status_bonus(profile_status) + rating_bonus(rating) + get_ml_adjustment(scores[i])
         final_match = max(65, min(99, int(round(final_match))))
@@ -258,6 +274,7 @@ def predict_matches(payload, model_path):
             }
         )
 
+    # Sort best matches first.
     results.sort(
         key=lambda x: (
             x["matchPercent"],

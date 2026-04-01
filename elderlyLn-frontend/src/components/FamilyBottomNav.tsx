@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../constants/theme";
+import { useTranslation } from "react-i18next";
 
 type TabKey = "home" | "search" | "bookings" | "profile";
 
@@ -12,6 +13,10 @@ export default function FamilyBottomNav({
   active: TabKey;
   navigation: any;
 }) {
+  const { t, i18n } = useTranslation();
+  const isTamil = i18n.language === "ta";
+
+  // Reusable bottom navigation item used for each family tab
   const Item = ({
     keyName,
     label,
@@ -27,25 +32,53 @@ export default function FamilyBottomNav({
     return (
       <Pressable
         onPress={() => {
+          // Navigates to the relevant screen based on the selected tab
           if (keyName === "home") navigation.navigate("FamilyHome");
           if (keyName === "search") navigation.navigate("FindCaregiver");
           if (keyName === "bookings") navigation.navigate("MyBookings");
-          if (keyName === "profile") navigation.navigate("EditProfile"); // placeholder if you don’t have FamilyProfile yet
+          if (keyName === "profile") navigation.navigate("EditProfile");
         }}
         style={styles.tab}
       >
         <Ionicons name={icon as any} size={22} color={color} />
-        <Text style={[styles.label, { color }]}>{label}</Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={[
+            styles.label,
+            isTamil && styles.labelTamil,
+            { color }
+          ]}
+        >
+          {label}
+        </Text>
       </Pressable>
     );
   };
 
   return (
     <View style={styles.bar}>
-      <Item keyName="home" label="Home" icon={active === "home" ? "home" : "home-outline"} />
-      <Item keyName="search" label="Search" icon={active === "search" ? "search" : "search-outline"} />
-      <Item keyName="bookings" label="Bookings" icon={active === "bookings" ? "calendar" : "calendar-outline"} />
-      <Item keyName="profile" label="Profile" icon={active === "profile" ? "person" : "person-outline"} />
+      <Item
+        keyName="home"
+        label={t("nav_home")}
+        icon={active === "home" ? "home" : "home-outline"}
+      />
+      <Item
+        keyName="search"
+        label={t("nav_search")}
+        icon={active === "search" ? "search" : "search-outline"}
+      />
+      <Item
+        keyName="bookings"
+        label={t("nav_bookings")}
+        icon={active === "bookings" ? "calendar" : "calendar-outline"}
+      />
+      <Item
+        keyName="profile"
+        label={t("nav_profile")}
+        icon={active === "profile" ? "person" : "person-outline"}
+      />
     </View>
   );
 }
@@ -58,12 +91,26 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: "row",
     justifyContent: "space-around",
+    alignItems: "center",
     paddingTop: 10,
     paddingBottom: 18,
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: theme.colors.border
   },
-  tab: { alignItems: "center", gap: 4 },
-  label: { fontSize: 12, fontWeight: "700" }
+  tab: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 4
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center"
+  },
+  labelTamil: {
+    fontSize: 11
+  }
 });

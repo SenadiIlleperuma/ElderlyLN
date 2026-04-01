@@ -1,5 +1,13 @@
-import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  Image,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -8,13 +16,29 @@ import { useTranslation } from "react-i18next";
 import { theme } from "../../constants/theme";
 import { AuthStackParamList } from "../../RootNavigator";
 import FamilyBottomNav from "../../components/FamilyBottomNav";
+import { api } from "../../api/api";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "TopMatches">;
 
+function getInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 export default function TopMatchesScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
-
   const { matches = [], filters } = route.params || ({} as any);
+
+  // Tracks which caregiver card is currently loading before navigation
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  // Stores failed image states to avoid repeatedly rendering broken profile images
+  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
 
   const district = filters?.district || "anywhere";
   const displayDistrict =
@@ -22,9 +46,37 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
       ? t("sri_lanka")
       : district.charAt(0).toUpperCase() + district.slice(1);
 
+    // Attempts to fetch the full caregiver profile before opening the profile screen
+  const openCaregiverProfile = async (c: any) => {
+    try {
+      const caregiverId = String(
+        c?.caregiver_id ?? c?.caregiverId ?? c?.id ?? ""
+      ).trim();
+
+      // If no valid caregiver ID is found, navigate with the existing data 
+      if (!caregiverId) {
+        navigation.navigate("CaregiverProfile", { caregiver: c, filters });
+        return;
+      }
+      setOpeningId(caregiverId);
+
+      // Requests the full caregiver profile for detailed viewing
+      const res = await api.get(`/profile/caregiver/${caregiverId}`);
+
+      navigation.navigate("CaregiverProfile", {
+        caregiver: res.data,
+        filters,
+      });
+    } catch (err: any) {
+      console.log("openCaregiverProfile error:", err?.response?.data || err?.message || err);
+      navigation.navigate("CaregiverProfile", { caregiver: c, filters });
+    } finally {
+      setOpeningId(null);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
-
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
@@ -38,7 +90,6 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-
         <View style={styles.banner}>
           <View style={styles.bannerIcon} />
           <View style={{ flex: 1 }}>
@@ -51,7 +102,7 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
             <Text style={styles.edit}>{t("edit")}</Text>
           </Pressable>
         </View>
-
+        {/* Displays an empty state if no caregivers matched the selected filters */}
         {matches.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="search-outline" size={64} color={theme.colors.muted} />
@@ -63,30 +114,87 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
           </View>
         ) : (
           matches.map((c: any) => {
-            const ratingSafe = typeof c.rating === "number" ? c.rating : 0;
-            const reviewsSafe = typeof c.reviewsCount === "number" ? c.reviewsCount : 0;
-            const expSafe = typeof c.experienceYears === "number" ? c.experienceYears : 0;
+            // Normalise rating values from possible backend field names
+            const ratingSafe =
+              typeof c.rating === "number"
+                ? c.rating
+                : typeof c.avg_rating === "number"
+                ? Number(c.avg_rating)
+                : typeof c.avg_rating === "string"
+                ? Number(c.avg_rating) || 0
+                : 0;
+            // Normalise review count values from possible backend field names  
+            const reviewsSafe =
+              typeof c.reviewsCount === "number"
+                ? c.reviewsCount
+                : typeof c.reviews_count === "number"
+                ? c.reviews_count
+                : 0;
 
-            const specialtiesArr: string[] = Array.isArray(c.specialties) ? c.specialties : [];
+            const expSafe =
+              typeof c.experienceYears === "number"
+                ? c.experienceYears
+                : typeof c.years_experience === "number"
+                ? c.years_experience
+                : typeof c.experience_years === "number"
+                ? c.experience_years
+                : typeof c.experience_years === "string"
+                ? Number(c.experience_years) || 0
+                : 0;
+            // Extracts caregiver specialities for summary text and tag rendering
+            const specialtiesArr: string[] = Array.isArray(c.specialties)
+              ? c.specialties
+              : Array.isArray(c.care_category)
+              ? c.care_category
+              : [];
+            // Use the first specialty
             const firstLine = specialtiesArr?.[0] || t("caregiver_generic");
+            const displayName = c?.name ?? c?.full_name ?? t("caregiver_generic");
+            const initials = getInitials(displayName);
+
+            const profileImageUrl =
+              c?.profile_image_url ??
+              c?.profileImageUrl ??
+              c?.image_url ??
+              c?.imageUrl ??
+              "";
+            // A stable key and loading reference for each caregiver card is made 
+            const caregiverId = String(
+              c?.caregiver_id ?? c?.caregiverId ?? c?.id ?? displayName
+            );
+            const isOpening = openingId === caregiverId;
+            const showImage = !!profileImageUrl && !brokenImages[caregiverId];
 
             return (
               <Pressable
-                key={c.id || c.caregiver_id || c.caregiverId || c.user_fk || c.name}
-                onPress={() => navigation.navigate("CaregiverProfile", { caregiver: c, filters })}
+                key={caregiverId}
+                onPress={() => openCaregiverProfile(c)}
                 style={styles.card}
+                disabled={isOpening}
               >
                 <View style={styles.matchBadge}>
-                  <Text style={styles.matchText}>{c.matchPercent}% {t("match_label")}</Text>
+                  <Text style={styles.matchText}>
+                    {c.matchPercent}% {t("match_label")}
+                  </Text>
                 </View>
 
                 <View style={styles.row}>
                   <View style={styles.pic}>
-                    <Ionicons name="person" size={24} color="#98A2B3" />
+                    {showImage ? (
+                      <Image
+                        source={{ uri: profileImageUrl }}
+                        style={styles.picImage}
+                        onError={() =>
+                          setBrokenImages((prev) => ({ ...prev, [caregiverId]: true }))
+                        }
+                      />
+                    ) : (
+                      <Text style={styles.initialsText}>{initials}</Text>
+                    )}
                   </View>
 
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.name}>{c.name}</Text>
+                    <Text style={styles.name}>{displayName}</Text>
                     <Text style={styles.sub}>
                       {firstLine} • {expSafe} {t("yrs_exp")}
                     </Text>
@@ -104,11 +212,15 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
                 <View style={styles.bottomRow}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <Ionicons name="star" size={16} color="#F4B400" />
-                    <Text style={styles.rating}>{ratingSafe.toFixed(1)}</Text>
+                    <Text style={styles.rating}>{Number(ratingSafe || 0).toFixed(1)}</Text>
                     <Text style={styles.muted}>({reviewsSafe})</Text>
                   </View>
 
-                  <Text style={styles.viewProfile}>{t("view_profile")}</Text>
+                  {isOpening ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : (
+                    <Text style={styles.viewProfile}>{t("view_profile")}</Text>
+                  )}
                 </View>
               </Pressable>
             );
@@ -190,6 +302,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#EEF2F6",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  picImage: {
+    width: "100%",
+    height: "100%",
+  },
+  initialsText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: theme.colors.primary,
   },
 
   name: { fontSize: 18, fontWeight: "900", color: theme.colors.text },

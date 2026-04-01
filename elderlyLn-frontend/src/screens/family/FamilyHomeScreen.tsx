@@ -1,21 +1,11 @@
 import React, { useCallback, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
-  Modal,
-} from "react-native";
+import { View,Text,StyleSheet,Pressable,ScrollView,ActivityIndicator,RefreshControl,Modal,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
-
 import { theme } from "../../constants/theme";
 import { AuthStackParamList } from "../../RootNavigator";
 import FamilyBottomNav from "../../components/FamilyBottomNav";
@@ -35,12 +25,13 @@ type BookingRow = {
 
 type BookingStatusUI = "UPCOMING" | "COMPLETED" | "REQUESTED";
 
+// Languages options shown in the family home header
 const LANGUAGES = [
   { code: "en", label: "English", short: "EN" },
   { code: "si", label: "සිංහල", short: "SI" },
   { code: "ta", label: "தமிழ்", short: "TA" },
 ];
-
+// Format booking dates for the recent bookings section
 function formatShortDate(iso: string) {
   const d = new Date(iso);
   const y = d.getFullYear();
@@ -48,13 +39,13 @@ function formatShortDate(iso: string) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
+// Clean and normalize booking data for display
 function clean(v: any) {
   const s = String(v ?? "").trim();
   if (!s || s === "not_set" || s === "null" || s === "undefined") return "";
   return s;
 }
-
+// Convert backend booking status into simplified UI status
 function toUiStatus(s: BookingRow["booking_status"]): BookingStatusUI {
   if (s === "Completed") return "COMPLETED";
   if (s === "Requested") return "REQUESTED";
@@ -71,9 +62,11 @@ export default function FamilyHomeScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
+  // Determine the currently selected language
   const currentLanguage =
     LANGUAGES.find((lang) => lang.code === i18n.language) || LANGUAGES[0];
 
+  // Load the user's full name from AsyncStorage for the greeting message
   const loadUserName = async () => {
     try {
       const userStr = await AsyncStorage.getItem("user");
@@ -93,10 +86,11 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       setFullName("");
     }
   };
-
+// Load a small set of recent bookings for the home screen
   const fetchRecentBookings = async () => {
     try {
       setLoadingRecent(true);
+      // Request the user's bookings from the backend
       const res = await api.get("/booking/myBookings");
       const all: BookingRow[] = Array.isArray(res.data) ? res.data : [];
       setRecent(all.slice(0, 2));
@@ -107,14 +101,14 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       setLoadingRecent(false);
     }
   };
-
+// Refresh the greeting and recent bookings when the screen is focused
   useFocusEffect(
     useCallback(() => {
       loadUserName();
       fetchRecentBookings();
     }, [])
   );
-
+// Refresh handler for pull-to-refresh, reloads the user's name and recent bookings
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadUserName();
@@ -122,6 +116,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
     setRefreshing(false);
   }, []);
 
+  // Handle changing the app's language and save it locally
   const handleChangeLanguage = async (langCode: string) => {
     try {
       await i18n.changeLanguage(langCode);
@@ -131,13 +126,14 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       console.log("Language change error:", error);
     }
   };
-
+//  Return the translated label for each simplified booking status
   const statusLabel = (s: BookingStatusUI) => {
-    if (s === "UPCOMING") return t("status_upcoming") || "Upcoming";
-    if (s === "COMPLETED") return t("status_completed") || "Completed";
-    return t("status_requested") || "Requested";
+    if (s === "UPCOMING") return t("status_upcoming");
+    if (s === "COMPLETED") return t("status_completed");
+    return t("status_requested");
   };
 
+  // 
   const Badge = ({ status }: { status: BookingStatusUI }) => {
     const bg = status === "UPCOMING" ? "#E8F1FF" : status === "COMPLETED" ? "#E7F8EE" : "#FFF2E0";
     const txt = status === "UPCOMING" ? "#2E6BFF" : status === "COMPLETED" ? "#1F8A4C" : "#B25B00";
@@ -147,7 +143,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       </View>
     );
   };
-
+// Handle user logout
   const onLogout = async () => {
     await AsyncStorage.multiRemove(["token", "user", "role", "session"]);
     navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
@@ -160,7 +156,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
           <Text style={styles.logoText}>E</Text>
         </View>
 
-        <Text style={styles.headerTitle}>{t("nav_home") || "Home"}</Text>
+        <Text style={styles.headerTitle}>{t("nav_home")}</Text>
 
         <View style={styles.headerActions}>
           <Pressable onPress={() => setLanguageModalVisible(true)} style={styles.langBtn}>
@@ -204,6 +200,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+         {/* Greeting card with user's name and quick access to profile */}
         <View style={styles.greetCard}>
           <View style={styles.greetIcon}>
             <Text style={{ fontSize: 22 }}>🏠</Text>
@@ -211,10 +208,10 @@ export default function FamilyHomeScreen({ navigation }: Props) {
 
           <View style={styles.greetTextWrap}>
             <Text style={styles.greetTitle}>
-              {t("hello_name", { name: fullName?.trim() ? fullName : t("guest") || "Guest" })}
+              {t("hello_name", { name: fullName?.trim() ? fullName : t("guest") })}
             </Text>
             <Text style={styles.greetSub}>
-              {t("welcome_portal") || "Welcome to your family care portal."}
+              {t("welcome_portal")}
             </Text>
           </View>
 
@@ -222,23 +219,23 @@ export default function FamilyHomeScreen({ navigation }: Props) {
             <Ionicons name="person-outline" size={22} color={theme.colors.primary} />
           </Pressable>
         </View>
-
+          {/* Search for caregivers */}
         <View style={styles.bigCard}>
-          <Text style={styles.bigTitle}>{t("find_support") || "Find support"}</Text>
+          <Text style={styles.bigTitle}>{t("find_support")}</Text>
           <Text style={styles.bigSub}>
-            {t("find_support_sub") || "Let our AI help you find the best caregiver match."}
+            {t("find_support_sub")}
           </Text>
 
           <Pressable onPress={() => navigation.navigate("FindCaregiver")} style={styles.searchPill}>
             <Ionicons name="search" size={18} color={theme.colors.primary} />
-            <Text style={styles.searchPillText}>{t("start_search") || "Start Search"}</Text>
+            <Text style={styles.searchPillText}>{t("start_search")}</Text>
           </Pressable>
         </View>
 
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>{t("recent_bookings") || "Recent bookings"}</Text>
+          <Text style={styles.sectionTitle}>{t("recent_bookings")}</Text>
           <Pressable onPress={() => navigation.navigate("MyBookings", {})}>
-            <Text style={styles.link}>{t("view_all") || "View all"}</Text>
+            <Text style={styles.link}>{t("view_all")}</Text>
           </Pressable>
         </View>
 
@@ -246,22 +243,23 @@ export default function FamilyHomeScreen({ navigation }: Props) {
           <View style={{ paddingVertical: 18, alignItems: "center" }}>
             <ActivityIndicator />
             <Text style={{ marginTop: 8, color: theme.colors.muted, fontWeight: "800" }}>
-              {t("loading_bookings") || "Loading bookings..."}
+              {t("loading_bookings")}
             </Text>
           </View>
         ) : recent.length === 0 ? (
           <View style={styles.emptyRecent}>
-            <Text style={styles.emptyRecentTitle}>{t("no_bookings_yet") || "No bookings yet"}</Text>
+            <Text style={styles.emptyRecentTitle}>{t("no_bookings_yet")}</Text>
             <Text style={styles.emptyRecentSub}>
-              {t("no_bookings_sub") || "Book a caregiver and your requests will appear here."}
+              {t("no_bookings_sub")}
             </Text>
           </View>
         ) : (
+          // Show the most recent bookings with a quick status view
           recent.map((b) => {
             const uiStatus = toUiStatus(b.booking_status);
-            const caregiverName = clean(b.caregiver_name) || (t("caregiver_generic") || "Caregiver");
+            const caregiverName = clean(b.caregiver_name) || t("caregiver_generic");
             const date = formatShortDate(b.service_date);
-            const service = clean(b.caregiver_service_type) || (t("service_type") || "Service");
+            const service = clean(b.caregiver_service_type) || t("service_type");
 
             return (
               <Pressable
@@ -291,8 +289,10 @@ export default function FamilyHomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
-
+  safe: { 
+    flex: 1,
+   backgroundColor: theme.colors.bg 
+  },
   header: {
     height: 56,
     flexDirection: "row",
@@ -343,7 +343,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
   },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.10)",
@@ -376,9 +375,9 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontWeight: "700",
   },
-
-  content: { padding: theme.spacing.lg },
-
+  content: { 
+    padding: theme.spacing.lg 
+  },
   greetCard: {
     backgroundColor: theme.colors.card,
     borderRadius: 20,
@@ -421,7 +420,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   bigCard: {
     marginTop: 16,
     backgroundColor: theme.colors.primary,
@@ -456,7 +454,6 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontSize: 15,
   },
-
   sectionRow: {
     marginTop: 20,
     marginBottom: 10,
@@ -503,10 +500,15 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
     lineHeight: 18,
   },
-
-  badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  badgeText: { fontSize: 11.5, fontWeight: "900" },
-
+  badge: { 
+    paddingHorizontal: 10, 
+    paddingVertical: 6,
+    borderRadius: 999 
+  },
+  badgeText: { 
+    fontSize: 11.5, 
+    fontWeight: "900" 
+  },
   emptyRecent: {
     backgroundColor: "white",
     borderRadius: 16,

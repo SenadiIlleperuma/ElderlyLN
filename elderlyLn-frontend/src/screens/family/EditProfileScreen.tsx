@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, Alert, ActivityIndicator } from "react-native";
+import { View,Text, StyleSheet,Pressable,TextInput, ScrollView, Alert,ActivityIndicator,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
+import { useTranslation } from "react-i18next";
 import { theme } from "../../constants/theme";
 import { AuthStackParamList } from "../../RootNavigator";
 import { api } from "../../api/api";
@@ -12,6 +12,8 @@ import { api } from "../../api/api";
 type Props = NativeStackScreenProps<AuthStackParamList, "EditProfile">;
 
 export default function EditProfileScreen({ navigation }: Props) {
+  const { t } = useTranslation();
+
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [district, setDistrict] = useState("");
@@ -27,15 +29,15 @@ export default function EditProfileScreen({ navigation }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-
+ // Load the user's profile information
   const loadProfile = async () => {
     try {
       setLoading(true);
+      // Make API call to fetch profile data
       const res = await api.get("/profile/me");
 
       const p = res.data;
-
+      // Store loaded values both in form state and original state
       const next = {
         fullName: p.full_name ?? "",
         phone: p.phone_no ?? "",
@@ -51,22 +53,23 @@ export default function EditProfileScreen({ navigation }: Props) {
       setOriginal(next);
     } catch (err: any) {
       console.log("Load profile error:", err?.response?.data || err?.message);
-      Alert.alert("Error", err?.response?.data?.message || "Failed to load profile.");
+      Alert.alert(t("error_title"), err?.response?.data?.message || t("failed_load_profile"));
     } finally {
       setLoading(false);
     }
   };
-
+  // Load profile when screen opens
   useEffect(() => {
     loadProfile();
   }, []);
 
-
+  // Save the current profile values to original state and enable editing mode
   const startEdit = () => {
     setOriginal({ fullName, phone, district, email });
     setIsEditing(true);
   };
 
+  // Cancel the edit and revert to original values
   const cancelEdit = () => {
     setFullName(original.fullName);
     setPhone(original.phone);
@@ -75,16 +78,17 @@ export default function EditProfileScreen({ navigation }: Props) {
     setIsEditing(false);
   };
 
-
+  // Validate and save the profile changes
   const saveProfile = async () => {
+    // Check if any required fields are empty
     if (!fullName.trim() || !district.trim() || !email.trim() || !phone.trim()) {
-      Alert.alert("Missing fields", "Please fill all fields before saving.");
+      Alert.alert(t("missing_fields_title"), t("missing_fields_msg"));
       return;
     }
 
     try {
       setSaving(true);
-
+      // Send the updated profile data to the server
       await api.put("/profile/me", {
         full_name: fullName.trim(),
         phone_no: phone.trim(),
@@ -92,81 +96,86 @@ export default function EditProfileScreen({ navigation }: Props) {
         email: email.trim(),
       });
 
-      Alert.alert("Saved", "Profile updated.");
+      Alert.alert(t("saved_title"), t("profile_updated_msg"));
       setIsEditing(false);
       await loadProfile();
     } catch (err: any) {
       console.log("Save profile error:", err?.response?.data || err?.message);
-      Alert.alert("Failed", err?.response?.data?.message || "Could not update profile.");
+      Alert.alert(t("failed_title"), err?.response?.data?.message || t("could_not_update_profile"));
     } finally {
       setSaving(false);
     }
   };
-
+// Temporarily deactivate the account with confirmation
   const deactivateAccount = () => {
     Alert.alert(
-      "Deactivate account?",
-      "This will temporarily disable your account. You can activate again by logging in.",
+      t("deactivate_account_title"),
+      t("deactivate_account_msg"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("cancel"), style: "cancel" },
         {
-          text: "Deactivate",
+          text: t("deactivate_temporarily"),
           style: "destructive",
           onPress: async () => {
             try {
+              // API call to deactivate the account
               await api.put("/profile/deactivate");
               await AsyncStorage.removeItem("token");
 
-              Alert.alert("Done", "Account deactivated.");
-              navigation.reset({ index: 0, routes: [{ name: "Login", params: { role: "family" } }] });
+              Alert.alert(t("done_title"), t("account_deactivated_msg"));
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Login", params: { role: "family" } }],
+              });
             } catch (err: any) {
               console.log("Deactivate error:", err?.response?.data || err?.message);
-              Alert.alert("Failed", err?.response?.data?.message || "Could not deactivate account.");
+              Alert.alert(t("failed_title"), err?.response?.data?.message || t("could_not_deactivate_account"));
             }
           },
         },
       ]
     );
   };
-
-  
+// Permanently delete the account with confirmation
   const deleteAccount = () => {
-    Alert.alert("Delete account permanently?", "This action cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("delete_account_title"), t("delete_account_msg"), [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Delete permanently",
+        text: t("delete_account_permanently"),
         style: "destructive",
         onPress: async () => {
           try {
+            // API call to delete the account permanently
             await api.delete("/profile/delete");
             await AsyncStorage.removeItem("token");
 
-            Alert.alert("Deleted", "Account deleted permanently.");
-            navigation.reset({ index: 0, routes: [{ name: "Login", params: { role: "family" } }] });
+            Alert.alert(t("deleted_title"), t("account_deleted_msg"));
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "Login", params: { role: "family" } }],
+            });
           } catch (err: any) {
             console.log("Delete error:", err?.response?.data || err?.message);
-            Alert.alert("Failed", err?.response?.data?.message || "Could not delete account.");
+            Alert.alert(t("failed_title"), err?.response?.data?.message || t("could_not_delete_account"));
           }
         },
       },
     ]);
   };
 
-  
   return (
     <SafeAreaView style={styles.safe}>
-
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
         </Pressable>
 
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitle}>{t("profile")}</Text>
 
         {!isEditing ? (
           <Pressable onPress={startEdit} style={styles.headerBtnRight}>
             <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
-            <Text style={styles.editText}>Edit</Text>
+            <Text style={styles.editText}>{t("edit")}</Text>
           </Pressable>
         ) : (
           <View style={styles.headerBtnRight} />
@@ -177,14 +186,12 @@ export default function EditProfileScreen({ navigation }: Props) {
         <View style={styles.center}>
           <ActivityIndicator />
           <Text style={{ marginTop: 10, color: theme.colors.muted, fontWeight: "700" }}>
-            Loading profile...
+            {t("loading_profile")}
           </Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-
           <View style={styles.topCard}>
-            <View style={styles.avatar} />
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{fullName || "—"}</Text>
               <Text style={styles.sub}>{district || "—"}</Text>
@@ -192,14 +199,14 @@ export default function EditProfileScreen({ navigation }: Props) {
 
             <View style={styles.verifiedPill}>
               <Ionicons name="shield-checkmark" size={16} color="#16A34A" />
-              <Text style={styles.verifiedText}>Verified</Text>
+              <Text style={styles.verifiedText}>{t("verified")}</Text>
             </View>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Personal Details</Text>
+            <Text style={styles.sectionTitle}>{t("personal_details")}</Text>
 
-            <Text style={styles.label}>Full Name</Text>
+            <Text style={styles.label}>{t("full_name")}</Text>
             <TextInput
               value={fullName}
               onChangeText={setFullName}
@@ -207,7 +214,7 @@ export default function EditProfileScreen({ navigation }: Props) {
               style={[styles.input, !isEditing && styles.inputDisabled]}
             />
 
-            <Text style={styles.label}>Phone</Text>
+            <Text style={styles.label}>{t("phone")}</Text>
             <TextInput
               value={phone}
               onChangeText={setPhone}
@@ -216,7 +223,7 @@ export default function EditProfileScreen({ navigation }: Props) {
               style={[styles.input, !isEditing && styles.inputDisabled]}
             />
 
-            <Text style={styles.label}>District</Text>
+            <Text style={styles.label}>{t("district")}</Text>
             <TextInput
               value={district}
               onChangeText={setDistrict}
@@ -224,7 +231,7 @@ export default function EditProfileScreen({ navigation }: Props) {
               style={[styles.input, !isEditing && styles.inputDisabled]}
             />
 
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t("email")}</Text>
             <TextInput
               value={email}
               onChangeText={setEmail}
@@ -237,34 +244,28 @@ export default function EditProfileScreen({ navigation }: Props) {
             {isEditing && (
               <View style={styles.editRow}>
                 <Pressable onPress={cancelEdit} style={styles.cancelBtn} disabled={saving}>
-                  <Text style={styles.cancelText}>Cancel</Text>
+                  <Text style={styles.cancelText}>{t("cancel")}</Text>
                 </Pressable>
 
                 <Pressable onPress={saveProfile} style={styles.saveBtn} disabled={saving}>
-                  {saving ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.saveText}>Save</Text>
-                  )}
+                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>{t("save")}</Text>}
                 </Pressable>
               </View>
             )}
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Account Actions</Text>
+            <Text style={styles.sectionTitle}>{t("account_actions")}</Text>
 
             <Pressable onPress={deactivateAccount} style={styles.actionBtn}>
               <Ionicons name="pause-circle-outline" size={18} color={theme.colors.text} />
-              <Text style={styles.actionText}>Deactivate temporarily</Text>
+              <Text style={styles.actionText}>{t("deactivate_temporarily")}</Text>
             </Pressable>
 
             <Pressable onPress={deleteAccount} style={styles.deleteBtn}>
               <Ionicons name="trash-outline" size={18} color="white" />
-              <Text style={styles.deleteText}>Delete account permanently</Text>
+              <Text style={styles.deleteText}>{t("delete_account_permanently")}</Text>
             </Pressable>
-
-            
           </View>
 
           <View style={{ height: 40 }} />
@@ -273,10 +274,11 @@ export default function EditProfileScreen({ navigation }: Props) {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
-
+  safe: { 
+    flex: 1, 
+    backgroundColor: theme.colors.bg 
+  },
   header: {
     height: 56,
     flexDirection: "row",
@@ -285,8 +287,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  headerBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "900", color: theme.colors.text },
+  headerBtn: { 
+    width: 40, 
+    height: 40, 
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "900",
+    color: theme.colors.text,
+  },
   headerBtnRight: {
     minWidth: 70,
     height: 40,
@@ -295,26 +308,38 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
   },
-  editText: { color: theme.colors.primary, fontWeight: "900" },
-
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-
-  content: { padding: theme.spacing.xl },
-
+  editText: { 
+    color: theme.colors.primary, 
+    fontWeight: "900" 
+  },
+  center: { 
+    flex: 1,
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  content: { 
+    padding: theme.spacing.xl 
+  },
   topCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
     backgroundColor: "white",
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: 16,
   },
-  avatar: { width: 64, height: 64, borderRadius: 20, backgroundColor: "#E5E7EB" },
-  name: { fontSize: 18, fontWeight: "900", color: theme.colors.text },
-  sub: { marginTop: 3, fontSize: 13, fontWeight: "700", color: theme.colors.muted },
-
+  name: { 
+    fontSize: 18, 
+    fontWeight: "900", 
+    color: theme.colors.text 
+  },
+  sub: { 
+    marginTop: 3, 
+    fontSize: 13, 
+    fontWeight: "700", 
+    color: theme.colors.muted
+   },
   verifiedPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -324,8 +349,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
   },
-  verifiedText: { color: "#16A34A", fontWeight: "900", fontSize: 12 },
-
+  verifiedText: { 
+    color: "#16A34A", 
+    fontWeight: "900", 
+    fontSize: 12 
+  },
   card: {
     marginTop: 16,
     backgroundColor: "white",
@@ -334,9 +362,19 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     padding: 18,
   },
-  sectionTitle: { fontSize: 14, fontWeight: "900", color: theme.colors.text, marginBottom: 12 },
-
-  label: { marginTop: 10, marginBottom: 8, fontSize: 13, fontWeight: "900", color: theme.colors.text },
+  sectionTitle: { 
+    fontSize: 14, 
+    fontWeight: "900",
+    color: theme.colors.text, 
+    marginBottom: 12 
+  },
+  label: {
+    marginTop: 10,
+    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: "900",
+    color: theme.colors.text,
+  },
   input: {
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -348,9 +386,14 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: theme.colors.text,
   },
-  inputDisabled: { opacity: 0.75 },
-
-  editRow: { flexDirection: "row", gap: 12, marginTop: 16 },
+  inputDisabled: { 
+    opacity: 0.75 
+  },
+  editRow: { 
+    flexDirection: "row",
+    gap: 12, 
+    marginTop: 16 
+  },
   cancelBtn: {
     flex: 1,
     borderWidth: 1,
@@ -360,8 +403,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "white",
   },
-  cancelText: { fontWeight: "900", color: theme.colors.text },
-
+  cancelText: { 
+    fontWeight: "900", 
+    color: theme.colors.text 
+  },
   saveBtn: {
     flex: 1,
     borderRadius: theme.radius.xl,
@@ -369,8 +414,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: theme.colors.primary,
   },
-  saveText: { fontWeight: "900", color: "white" },
-
+  saveText: { 
+    fontWeight: "900", 
+    color: "white" 
+  },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -383,8 +430,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bg,
     marginBottom: 12,
   },
-  actionText: { fontSize: 15, fontWeight: "900", color: theme.colors.text },
-
+  actionText: { 
+    fontSize: 15, 
+    fontWeight: "900", 
+    color: theme.colors.text 
+  },
   deleteBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -394,6 +444,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     backgroundColor: "#EF4444",
   },
-  deleteText: { color: "white", fontSize: 15, fontWeight: "900" },
-
+  deleteText: { 
+    color: "white", 
+    fontSize: 15, 
+    fontWeight: "900" 
+  },
 });
