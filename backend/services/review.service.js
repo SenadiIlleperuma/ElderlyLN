@@ -12,7 +12,7 @@ const score = Number(ratingScore);
   try {
     await client.query("BEGIN");
 
-    // 1) Validate booking ownership and status
+    // Validate booking ownership and status
     const bq = `
       SELECT b.booking_id, b.booking_status, b.family_fk, b.caregiver_fk, f.user_fk AS family_user_fk
       FROM booking b
@@ -29,14 +29,14 @@ const score = Number(ratingScore);
       throw new Error("You can only review after the booking is Completed.");
     }
 
-    // 2) Prevent duplicates
+    //Prevent duplicates
     const dq = `SELECT 1 FROM review WHERE booking_fk = $1 LIMIT 1`;
     const dRes = await client.query(dq, [bookingId]);
     if (dRes.rows.length > 0) {
       throw new Error("Review already submitted for this booking.");
     }
 
-    // 3) Insert review
+    // Insert review
     const iq = `
       INSERT INTO review (booking_fk, caregiver_fk, family_fk, rating_score, comment)
       VALUES ($1, $2, $3, $4, $5)
@@ -51,7 +51,7 @@ const score = Number(ratingScore);
       comment && String(comment).trim() !== "" ? comment : null,
     ]);
 
-    // 4) Recalculate avg rating for that caregiver and update caregiver table
+    // Recalculate avg rating for that caregiver and update caregiver table
     const avgQ = `
       UPDATE caregiver c
       SET avg_rating = sub.avg_rating

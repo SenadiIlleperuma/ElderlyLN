@@ -16,6 +16,7 @@ function caregiverProfileImageFilter(req, file, cb) {
   cb(null, true);
 }
 
+// Multer configuration for caregiver document uploads
 const caregiverDocUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: caregiverDocFileFilter,
@@ -24,6 +25,7 @@ const caregiverDocUpload = multer({
   },
 });
 
+// Multer configuration for caregiver profile image uploads
 const caregiverProfileImageUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: caregiverProfileImageFilter,

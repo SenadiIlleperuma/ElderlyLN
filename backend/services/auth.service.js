@@ -2,10 +2,12 @@ const db = require("../db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
+// JWT secret for token generation
 const JWT_SECRET =
   process.env.JWT_SECRET ||
   "150f6913e9b2c600d7463b2b27f027975459ff7416274fd051c33c42dac6a03a";
 
+  // Function to get the password column name dynamically
 const getPasswordColumn = async () => {
   const q = `
     SELECT column_name
@@ -21,6 +23,7 @@ const getPasswordColumn = async () => {
   return r.rows[0].column_name;
 };
 
+// Inserts into family or caregiver table based on role
 const insertProfile = async (userId, role, full_name, district, client) => {
   if (role === "admin") return;
 
@@ -39,6 +42,7 @@ const insertProfile = async (userId, role, full_name, district, client) => {
   }
 };
 
+// Registers a new user and creates their profile
 const registerUser = async (role, email, password, phone_no, full_name, district) => {
   const client = await db.pool.connect();
 
@@ -86,6 +90,7 @@ const registerUser = async (role, email, password, phone_no, full_name, district
   }
 };
 
+// Validates login credentials and returns a JWT token if successful
 const loginUser = async (email, password) => {
   const pwCol = await getPasswordColumn();
 
@@ -106,6 +111,7 @@ const loginUser = async (email, password) => {
   const isPasswordValid = await bcrypt.compare(password, user.password_hash);
   if (!isPasswordValid) throw new Error("Invalid email or password.");
 
+  // Fetch the user's profile information based on their role
   let profile = { full_name: null, district: null };
 
   if (user.role === "family") {

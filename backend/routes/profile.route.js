@@ -6,6 +6,7 @@ const { caregiverProfileImageUpload } = require("../utils/upload");
 
 router.use(authenticateToken);
 
+// Helper function to get the authenticated user's profile based on their role
 async function getMe(req) {
   if (req.user.role === "family") {
     return await profileService.getMyFamilyProfile(req.user.user_id);
@@ -94,6 +95,7 @@ router.put("/caregiver/me", async (req, res) => {
 
 router.get("/caregiver/:caregiverId", async (req, res) => {
   try {
+    // Public caregiver viewing is limited to authenticated roles  that are part of the system flow
     if (req.user.role !== "family" && req.user.role !== "admin" && req.user.role !== "caregiver") {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -115,6 +117,7 @@ router.post("/caregiver/profileImage", (req, res) => {
     return res.status(403).json({ message: "Forbidden: caregiver only." });
   }
 
+  // File upload is handled here, from the upload middleware can be returned properly
   caregiverProfileImageUpload.single("file")(req, res, async (err) => {
     try {
       if (err) {
@@ -158,6 +161,7 @@ router.delete("/caregiver/profileImage", async (req, res) => {
 
 router.get("/caregiver/verificationStatus", async (req, res) => {
   try {
+    // Used for checking the verification status of the authenticated caregiver
     if (req.user.role !== "caregiver") {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -188,6 +192,7 @@ router.post("/caregiver/documents", async (req, res) => {
 
     const { document_type, file_url, file_name, file_size_kb, mime_type } = req.body;
 
+    // This saves the document information for the authenticated caregiver
     if (!document_type || !file_url || !file_name) {
       return res
         .status(400)
@@ -210,6 +215,7 @@ router.post("/caregiver/documents", async (req, res) => {
 
 router.put("/caregiver/submitVerification", async (req, res) => {
   try {
+    // Moves caregiver profile into the verification process
     if (req.user.role !== "caregiver") {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -241,6 +247,7 @@ router.put("/account/reactivate", async (req, res) => {
 
 router.delete("/account/delete", async (req, res) => {
   try {
+    // Permanent account deletion
     const r = await profileService.deleteMyAccountPermanently(req.user.user_id);
     return res.json({ message: "Account deleted", result: r });
   } catch (e) {

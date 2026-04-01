@@ -6,13 +6,14 @@ const documentsService = require("../services/documents.service");
 const { caregiverDocUpload } = require("../utils/upload");
 
 router.use(authenticateToken);
-
+// All document routes require authentication, contain user info in req.user
 // POST /api/documents/caregiver/upload
 router.post("/caregiver/upload", (req, res) => {
   if (req.user.role !== "caregiver") {
     return res.status(403).json({ message: "Forbidden: caregiver only." });
   }
 
+// Use multer middleware to handle file upload
   caregiverDocUpload.single("file")(req, res, async (err) => {
     try {
       if (err) {
@@ -49,6 +50,7 @@ router.post("/caregiver/upload", (req, res) => {
 // GET /api/documents/caregiver/me
 router.get("/caregiver/me", async (req, res) => {
   try {
+    // Only caregivers can access their own documents
     if (req.user.role !== "caregiver") {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -64,6 +66,7 @@ router.get("/caregiver/me", async (req, res) => {
 // POST /api/documents/caregiver/submit
 router.post("/caregiver/submit", async (req, res) => {
   try {
+    // Only caregivers can submit documents for verification
     if (req.user.role !== "caregiver") {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -82,6 +85,7 @@ router.post("/caregiver/submit", async (req, res) => {
 // ADMIN: GET /api/documents/admin/caregiver/:caregiverId
 router.get("/admin/caregiver/:caregiverId", async (req, res) => {
   try {
+    // Admin can view any caregiver's documents
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Forbidden" });
     }

@@ -7,12 +7,11 @@ function normalizeStatus(value) {
     .replace(/\s+/g, "_");
 }
 
-// FAMILY/CAREGIVER: FILE COMPLAINT
+// Files complaint for booking.
 async function fileComplaint(userId, bookingId, reason, role) {
   if (!["family", "caregiver"].includes(role)) {
     throw new Error("Forbidden: Only family or caregiver users can file complaints.");
   }
-
   const bq = `
     SELECT
       b.booking_id,
@@ -33,10 +32,12 @@ async function fileComplaint(userId, bookingId, reason, role) {
   const isFamilyOwner = row.family_user_fk === userId;
   const isCaregiverOwner = row.caregiver_user_fk === userId;
 
+  // Ownership check
   if (!isFamilyOwner && !isCaregiverOwner) {
     throw new Error("Forbidden: this booking is not yours.");
   }
 
+  // Prevent duplicate complaint.
   const dq = `
     SELECT 1
     FROM complaint
@@ -65,7 +66,7 @@ async function fileComplaint(userId, bookingId, reason, role) {
   return iRes.rows[0];
 }
 
-// ADMIN: DASHBOARD STATS
+// Admin dashboard stats.
 async function getAdminStats() {
   const usersQ = `SELECT COUNT(*)::int AS total_users FROM "user" WHERE is_active = true`;
   const bookingsQ = `SELECT COUNT(*)::int AS total_bookings FROM booking`;
@@ -96,7 +97,7 @@ async function getAdminStats() {
   };
 }
 
-// ADMIN: VERIFICATION QUEUE
+// Gets admin verification queue.
 async function getVerificationQueue() {
   const q = `
     SELECT
@@ -129,7 +130,7 @@ async function getVerificationQueue() {
   }));
 }
 
-// ADMIN: Get caregiver details + uploaded documents for verification page
+// Gets caregiver + docs for admin.
 async function getCaregiverVerificationDetails(caregiverId) {
   const cq = `
     SELECT
@@ -182,7 +183,7 @@ async function getCaregiverVerificationDetails(caregiverId) {
   };
 }
 
-// ADMIN: APPROVE / REJECT caregiver
+// Approves or rejects caregiver.
 async function updateCaregiverStatus(caregiverId, adminUserId, newStatus, note, badge) {
   const normalized = normalizeStatus(newStatus);
   const allowed = ["VERIFIED", "REJECTED"];
@@ -245,7 +246,7 @@ async function updateCaregiverStatus(caregiverId, adminUserId, newStatus, note, 
   }
 }
 
-// ADMIN: LIST COMPLAINTS
+// Lists complaints for admin.
 async function listComplaintsForAdmin() {
   const q = `
     SELECT
@@ -278,7 +279,7 @@ async function listComplaintsForAdmin() {
   return r.rows;
 }
 
-// ADMIN: RESOLVE COMPLAINT
+// Resolves complaint.
 async function resolveComplaint(complaintId, adminUserId, resolutionNote, newStatus) {
   const allowed = ["Submitted", "Under Review", "Closed"];
 

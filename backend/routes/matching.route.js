@@ -4,6 +4,7 @@ const mlService = require("../services/ml.service");
 const profileService = require("../services/profile.service");
 const { authenticateToken } = require("../middleware/auth.middleware");
 
+// Helper function to extract caregiver ID from various possible fields
 function getMatchCaregiverId(match) {
   const raw =
     match?.caregiver_id ??
@@ -17,12 +18,14 @@ function getMatchCaregiverId(match) {
 
 router.post("/search", authenticateToken, async (req, res) => {
   try {
+    // Only allow families to search for caregivers
     if (req.user.role !== "family") {
       return res.status(403).json({
         message: "Forbidden: Only families can search for caregivers.",
       });
     }
 
+    // Extract filters from request body, with defaults
     const filters = {
       district: req.body.district || "",
       careCategory: req.body.careCategory || "",
@@ -35,6 +38,7 @@ router.post("/search", authenticateToken, async (req, res) => {
 
     const matches = await mlService.getPredictions(filters);
 
+    // ML results  are enriched with caregiver profile data
     const enrichedMatches = await Promise.all(
       (matches || []).map(async (match) => {
         try {
@@ -138,8 +142,8 @@ router.post("/search", authenticateToken, async (req, res) => {
               profile?.reviews_count ??
               0,
 
-            // other useful fields for profile screen
-            qualifications:
+            // other profile details
+              qualifications:
               match?.qualifications ??
               profile?.qualifications ??
               [],
@@ -180,6 +184,7 @@ router.post("/search", authenticateToken, async (req, res) => {
               [],
           };
         } catch (innerErr) {
+          // If enrichment fails, log the error but return the original match data
           console.log("Match enrichment skipped:", innerErr?.message || innerErr);
           return match;
         }

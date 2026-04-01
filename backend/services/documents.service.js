@@ -4,6 +4,7 @@ const notificationService = require("./notification.service");
 
 const ALLOWED_TYPES = ["NIC", "POLICE", "CERTIFICATE", "OTHER"];
 
+// Normalizes status text.
 function normalizeStatus(value) {
   return String(value || "")
     .trim()
@@ -11,6 +12,7 @@ function normalizeStatus(value) {
     .replace(/\s+/g, "_");
 }
 
+// Gets caregiver profile by user id.
 async function getCaregiverProfileByUserId(userId) {
   const q = `
     SELECT caregiver_id, profile_status, verification_badges
@@ -27,6 +29,7 @@ async function getCaregiverProfileByUserId(userId) {
   return r.rows[0];
 }
 
+// Uploads and saves document.
 async function saveCaregiverDocument({ userId, documentType, file }) {
   const type = String(documentType || "").toUpperCase().trim();
 
@@ -110,6 +113,7 @@ async function saveCaregiverDocument({ userId, documentType, file }) {
   return ins.rows[0];
 }
 
+// Lists current caregiver docs.
 async function listMyCaregiverDocuments(userId) {
   const caregiver = await getCaregiverProfileByUserId(userId);
   const caregiverId = caregiver.caregiver_id;
@@ -146,6 +150,7 @@ async function listMyCaregiverDocuments(userId) {
   };
 }
 
+// Lists docs for admin view
 async function listCaregiverDocumentsByCaregiverId(caregiverId) {
   const caregiverQ = `
     SELECT
@@ -196,6 +201,7 @@ async function listCaregiverDocumentsByCaregiverId(caregiverId) {
   };
 }
 
+// Submits caregiver for verification
 async function submitForVerification(userId) {
   const caregiver = await getCaregiverProfileByUserId(userId);
   const caregiverId = caregiver.caregiver_id;
@@ -250,7 +256,7 @@ async function submitForVerification(userId) {
 
     await db.query("COMMIT");
 
-    // Get caregiver name for admin notification
+    // Get caregiver name
     const caregiverNameQ = `
       SELECT u.full_name
       FROM caregiver c
@@ -261,7 +267,7 @@ async function submitForVerification(userId) {
     const caregiverNameRes = await db.query(caregiverNameQ, [caregiverId]);
     const caregiverName = caregiverNameRes.rows[0]?.full_name || "A caregiver";
 
-    // Notify all admins
+    // Notify admins
     await notificationService.notifyAllAdmins({
       title: "New caregiver verification request",
       message: `${caregiverName} has submitted documents for verification.`,

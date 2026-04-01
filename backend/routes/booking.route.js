@@ -4,12 +4,13 @@ const bookingService = require("../services/booking.service");
 const { authenticateToken } = require("../middleware/auth.middleware");
 
 router.use(authenticateToken);
-
+// All booking routes require a logged-in user
 // POST /api/booking/create
 router.post("/create", async (req, res) => {
   try {
     const { caregiverId, serviceDate, notes } = req.body;
 
+    // Only family users can create bookings
     if (req.user.role !== "family") {
       return res.status(403).json({
         message: "Forbidden: Only family users can create bookings.",
@@ -47,7 +48,7 @@ router.put("/status/:bookingId", async (req, res) => {
   try {
     const { status } = req.body;
     const { bookingId } = req.params;
-
+    // The service layer decides, this actor is allowed to update the booking status
     if (!status) {
       return res.status(400).json({ message: "Status is required." });
     }
@@ -72,6 +73,7 @@ router.put("/status/:bookingId", async (req, res) => {
 // GET /api/booking/myBookings
 router.get("/myBookings", async (req, res) => {
   try {
+    // Retrieve bookings for the logged-in user
     const bookings = await bookingService.getBookingsByUser(
       req.user.user_id,
       req.user.role

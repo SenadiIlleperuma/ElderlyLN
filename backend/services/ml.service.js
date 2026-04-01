@@ -2,9 +2,11 @@ const { spawn } = require("child_process");
 const path = require("path");
 const db = require("../db");
 
+// ML model and Python script paths
 const ML_MODEL_PATH = path.join(__dirname, "../../elderlyLn-ml/elderlyln_matcher_final.pkl");
 const PYTHON_SCRIPT_PATH = path.join(__dirname, "../ml/predict.py");
 
+// Maps frontend service filters to DB values
 const SERVICE_TYPE_MAP = {
   care_only: ["Looking after", "Looking after only", "Looking after, All-around care"],
   supervise_only: ["Supervising"],
@@ -12,6 +14,7 @@ const SERVICE_TYPE_MAP = {
   cook_and_care: ["Cooking + looking after", "Cooking and looking after"],
 };
 
+// Maps frontend time filters to DB values
 const TIME_PERIOD_MAP = {
   hourly: ["Hourly"],
   half_day: ["Half-day", "Half day"],
@@ -19,13 +22,16 @@ const TIME_PERIOD_MAP = {
   live_in: ["Live In", "Live-in"],
 };
 
+// Safe number conversion
 const toNumber = (v, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
 
+// Safe text normalization
 const normalizeText = (v) => (v === null || v === undefined ? "" : String(v).trim());
 
+// Converts DB arrays/strings to clean arrays
 const normalizeArrayFromDB = (v) => {
   if (!v) return [];
   if (Array.isArray(v)) return v.map(String).map((x) => x.trim()).filter(Boolean);
@@ -40,6 +46,7 @@ const normalizeArrayFromDB = (v) => {
   return s.split(",").map((x) => x.trim()).filter(Boolean);
 };
 
+// Normalizes caregiver profile status
 const normalizeProfileStatus = (status) => {
   const s = normalizeText(status).toUpperCase().replace(/\s+/g, "_");
   if (s === "VERIFIED") return "VERIFIED";
@@ -48,6 +55,7 @@ const normalizeProfileStatus = (status) => {
   return s || "UNKNOWN";
 };
 
+// Priority used for sorting
 const statusPriority = (status) => {
   const normalized = normalizeProfileStatus(status);
   if (normalized === "VERIFIED") return 3;
@@ -56,6 +64,7 @@ const statusPriority = (status) => {
   return 0;
 };
 
+// Converts expected salary to hourly rate
 const computeHourlyRate = (expectedSalary, preferredTime) => {
   const salary = toNumber(expectedSalary, 0);
   const period = normalizeText(preferredTime).toLowerCase();
@@ -70,6 +79,7 @@ const computeHourlyRate = (expectedSalary, preferredTime) => {
   return salary;
 };
 
+// Gets caregivers from DB using filters
 const getCaregiversFromDB = async (filters = {}) => {
   let sql = `
     SELECT
@@ -170,6 +180,7 @@ const getCaregiversFromDB = async (filters = {}) => {
   return result.rows;
 };
 
+// Runs Python ML prediction
 const runMLPrediction = (caregivers, familyRequirements) => {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify({ caregivers, familyRequirements });
@@ -205,6 +216,7 @@ const runMLPrediction = (caregivers, familyRequirements) => {
   });
 };
 
+// Sorts final results
 const sortWithStatusPriority = (items) => {
   return items.sort((a, b) => {
     const matchDiff = toNumber(b.matchPercent, 0) - toNumber(a.matchPercent, 0);
@@ -225,6 +237,7 @@ const sortWithStatusPriority = (items) => {
   });
 };
 
+// Fallback results if ML fails
 const buildFallbackResults = (caregivers) => {
   const mapped = caregivers.map((cg) => ({
     id: String(cg.caregiver_id),
@@ -249,7 +262,7 @@ const buildFallbackResults = (caregivers) => {
 
   return sortWithStatusPriority(mapped);
 };
-
+// Main prediction flow
 const getPredictions = async (filters = {}) => {
   const caregivers = await getCaregiversFromDB(filters);
   if (caregivers.length === 0) return [];
