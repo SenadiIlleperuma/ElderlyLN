@@ -1,16 +1,5 @@
 import React, { useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Modal,
-  FlatList,
-  TextInput,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from "react-native";
+import {View,Text,StyleSheet,Pressable,Modal,FlatList,TextInput,ScrollView,Alert,ActivityIndicator,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -18,10 +7,10 @@ import { useTranslation } from "react-i18next";
 import { theme } from "../../constants/theme";
 import { AuthStackParamList } from "../../RootNavigator";
 import { api } from "../../api/api";
-
 type Props = NativeStackScreenProps<AuthStackParamList, "FindCaregiver">;
 type Option = { value: string; label: string };
 
+// Reusable modal selector used for each search filter
 function SelectField({
   label,
   valueLabel,
@@ -38,13 +27,14 @@ function SelectField({
   const [open, setOpen] = useState(false);
 
   return (
-    <View style={{ marginTop: 18 }}>
+    <View style={styles.fieldWrap}>
       <Text style={styles.label}>{label}</Text>
+
       <Pressable onPress={() => setOpen(true)} style={styles.selectBox}>
         <Text style={[styles.selectText, !valueLabel && { color: theme.colors.muted }]}>
           {valueLabel || placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={18} color={theme.colors.muted} />
+        <Ionicons name="chevron-down" size={20} color={theme.colors.muted} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -77,57 +67,58 @@ function SelectField({
 export default function FindCaregiverScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
-
+// Map UI service type choices to backend expected values
   const SERVICE_TYPE_DB_MAP: Record<string, string> = {
     cook_and_care: "Cooking + looking after",
     care_only: "Looking after",
     supervise_only: "Supervising",
     all_around: "All-around",
-    other: "", 
+    other: "",
   };
-
+// Map UI time period choices to backend expected values
   const TIME_PERIOD_DB_MAP: Record<string, string> = {
     hourly: "Hourly",
     half_day: "Half-day",
     full_day: "Full-day",
-    live_in: "Live-in", 
+    live_in: "Live-in",
     other: "",
   };
 
-  
- const districtKeys = [
+  const districtKeys = [
     ["anywhere", t("district_anywhere")],
-  ["ampara", t("district_ampara")],
-  ["anuradhapura", t("district_anuradhapura")],
-  ["badulla", t("district_badulla")],
-  ["batticaloa", t("district_batticaloa")],
-  ["colombo", t("district_colombo")],
-  ["galle", t("district_galle")],
-  ["gampaha", t("district_gampaha")],
-  ["hambantota", t("district_hambantota")],
-  ["jaffna", t("district_jaffna")],
-  ["kalutara", t("district_kalutara")],
-  ["kandy", t("district_kandy")],
-  ["kegalle", t("district_kegalle")],
-  ["kilinochchi", t("district_kilinochchi")],
-  ["kurunegala", t("district_kurunegala")],
-  ["mannar", t("district_mannar")],
-  ["matale", t("district_matale")],
-  ["matara", t("district_matara")],
-  ["moneragala", t("district_moneragala")],
-  ["mullaitivu", t("district_mullaitivu")],
-  ["nuwara_eliya", t("district_nuwara_eliya")],
-  ["polonnaruwa", t("district_polonnaruwa")],
-  ["puttalam", t("district_puttalam")],
-  ["ratnapura", t("district_ratnapura")],
-  ["trincomalee", t("district_trincomalee")],
-  ["vavuniya", t("district_vavuniya")],
-] as const;
+    ["ampara", t("district_ampara")],
+    ["anuradhapura", t("district_anuradhapura")],
+    ["badulla", t("district_badulla")],
+    ["batticaloa", t("district_batticaloa")],
+    ["colombo", t("district_colombo")],
+    ["galle", t("district_galle")],
+    ["gampaha", t("district_gampaha")],
+    ["hambantota", t("district_hambantota")],
+    ["jaffna", t("district_jaffna")],
+    ["kalutara", t("district_kalutara")],
+    ["kandy", t("district_kandy")],
+    ["kegalle", t("district_kegalle")],
+    ["kilinochchi", t("district_kilinochchi")],
+    ["kurunegala", t("district_kurunegala")],
+    ["mannar", t("district_mannar")],
+    ["matale", t("district_matale")],
+    ["matara", t("district_matara")],
+    ["moneragala", t("district_moneragala")],
+    ["mullaitivu", t("district_mullaitivu")],
+    ["nuwara_eliya", t("district_nuwara_eliya")],
+    ["polonnaruwa", t("district_polonnaruwa")],
+    ["puttalam", t("district_puttalam")],
+    ["ratnapura", t("district_ratnapura")],
+    ["trincomalee", t("district_trincomalee")],
+    ["vavuniya", t("district_vavuniya")],
+  ] as const;
+// Build the district dropdown options with the translated labels
   const districtOptions: Option[] = useMemo(
     () => districtKeys.map(([value, label]) => ({ value, label })),
     [t]
   );
 
+  // Build the care category dropdown options with translated labels
   const careCategoryOptions: Option[] = useMemo(
     () => [
       { value: "elderly", label: t("care_elderly") },
@@ -140,7 +131,7 @@ export default function FindCaregiverScreen({ navigation }: Props) {
     ],
     [t]
   );
-
+ // Build the service type dropdown options with translated labels
   const serviceTypeOptions: Option[] = useMemo(
     () => [
       { value: "cook_and_care", label: t("cook_and_care") },
@@ -163,6 +154,7 @@ export default function FindCaregiverScreen({ navigation }: Props) {
     [t]
   );
 
+  // State for each search filter, initialized to null or default values
   const [district, setDistrict] = useState<Option>(districtOptions[0]);
   const [careCategory, setCareCategory] = useState<Option | null>(null);
   const [serviceType, setServiceType] = useState<Option | null>(null);
@@ -172,31 +164,30 @@ export default function FindCaregiverScreen({ navigation }: Props) {
   const onSearch = async () => {
     setLoading(true);
     try {
+    // Convert "anywhere" into an empty district value for the backend
       const districtValue = district.value === "anywhere" ? "" : district.value;
       const careCategoryValue = careCategory?.value || "";
       const serviceTypeCode = serviceType?.value || "";
       const timePeriodCode = timePeriod?.value || "";
-
+      // Map selected UI values into the backend format
       const serviceTypeDB = SERVICE_TYPE_DB_MAP[serviceTypeCode] ?? "";
       const timePeriodDB = TIME_PERIOD_DB_MAP[timePeriodCode] ?? "";
-
+      // Build the search payload with all selected filters
       const payload = {
         district: districtValue,
         careCategory: careCategoryValue === "other" ? "" : careCategoryValue,
-        serviceType: serviceTypeDB,   
-        timePeriod: timePeriodDB,    
+        serviceType: serviceTypeDB,
+        timePeriod: timePeriodDB,
         needs: needs.trim(),
       };
 
-      console.log("Sending search request:", payload);
-
+      // Request matching caregivers from the backend
       const res = await api.post("/matching/search", payload);
       const matches = res.data?.matches || [];
 
-      console.log(`Received ${matches.length} matches`);
-
+      // Shows an alert if no caregivers match the selected filters
       if (matches.length === 0) {
-        Alert.alert("No Matches", "No caregivers found. Try different filters.");
+        Alert.alert(t("no_matches_alert_title"), t("no_matches_alert_msg"));
       } else {
         navigation.navigate("TopMatches", {
           filters: payload,
@@ -205,7 +196,7 @@ export default function FindCaregiverScreen({ navigation }: Props) {
       }
     } catch (err: any) {
       console.error("Search error:", err?.response?.data || err?.message || err);
-      Alert.alert("Error", err?.response?.data?.message || "Unable to connect to server");
+      Alert.alert(t("error_title"), err?.response?.data?.message || t("unable_connect_server"));
     } finally {
       setLoading(false);
     }
@@ -217,13 +208,15 @@ export default function FindCaregiverScreen({ navigation }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
         </Pressable>
+
         <Text style={styles.headerTitle}>{t("find_caregiver")}</Text>
+
         <View style={styles.headerBtn} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.banner}>
-          <Ionicons name="filter" size={18} color={theme.colors.primary} />
+          <Ionicons name="filter" size={20} color={theme.colors.primary} />
           <Text style={styles.bannerText}>{t("filter_tip")}</Text>
         </View>
 
@@ -269,7 +262,7 @@ export default function FindCaregiverScreen({ navigation }: Props) {
           multiline
         />
 
-        <View style={{ height: 110 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       <View style={styles.bottomBar}>
@@ -289,40 +282,81 @@ export default function FindCaregiverScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  safe: { 
+    flex: 1, 
+    backgroundColor: theme.colors.bg 
+  },
   header: {
-    height: 56,
+    minHeight: 64,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  headerBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "900", color: theme.colors.text },
-  content: { padding: theme.spacing.xl },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "900",
+    color: theme.colors.text,
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+  content: { 
+    padding: theme.spacing.xl 
+  },
+  fieldWrap: {
+    marginTop: 18,
+  },
   banner: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
     backgroundColor: "#EFF6FF",
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     padding: 14,
   },
-  bannerText: { flex: 1, color: theme.colors.primary, fontWeight: "700" },
-  label: { fontSize: 14, fontWeight: "900", color: theme.colors.text, marginBottom: 8 },
+  bannerText: {
+    flex: 1,
+    color: theme.colors.primary,
+    fontWeight: "700",
+    lineHeight: 22,
+    fontSize: 15,
+  },
+
+  label: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: theme.colors.text,
+    marginBottom: 8,
+    lineHeight: 20,
+  },
   selectBox: {
     borderWidth: 2,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     paddingHorizontal: 14,
     paddingVertical: 16,
     backgroundColor: "white",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
   },
-  selectText: { fontSize: 16, fontWeight: "700", color: theme.colors.text },
+  selectText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "700",
+    color: theme.colors.text,
+    lineHeight: 24,
+  },
   textArea: {
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -334,7 +368,9 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
     fontSize: 15,
     color: theme.colors.text,
+    lineHeight: 22,
   },
+
   bottomBar: {
     position: "absolute",
     left: 0,
@@ -354,11 +390,44 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  searchBtnText: { color: "white", fontSize: 16, fontWeight: "900" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 18 },
-  modalCard: { backgroundColor: "white", borderRadius: 18, padding: 16, maxHeight: "70%" },
-  modalTitle: { fontSize: 16, fontWeight: "900", color: theme.colors.text, marginBottom: 10 },
-  optionRow: { paddingVertical: 14, paddingHorizontal: 10 },
-  optionText: { fontSize: 15, fontWeight: "700", color: theme.colors.text },
-  sep: { height: 1, backgroundColor: theme.colors.border },
+  searchBtnText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "900",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    padding: 18,
+  },
+  modalCard: {
+    backgroundColor: "white",
+    borderRadius: 18,
+    padding: 16,
+    maxHeight: "70%",
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: theme.colors.text,
+    marginBottom: 10,
+    lineHeight: 22,
+  },
+  optionRow: {
+    paddingVertical: 14, 
+    paddingHorizontal: 10 
+  },
+  optionText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: theme.colors.text,
+    lineHeight: 22,
+  },
+  sep: { 
+    height: 1, 
+    backgroundColor: theme.colors.border
+   },
 });

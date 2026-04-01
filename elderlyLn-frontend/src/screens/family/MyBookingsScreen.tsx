@@ -1,28 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  Modal,
-  TextInput,
-  Alert,
-  RefreshControl,
-  ActivityIndicator,
-} from "react-native";
+import {View,Text,StyleSheet,Pressable, ScrollView,Modal,TextInput,Alert,RefreshControl,ActivityIndicator,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
-
 import { theme } from "../../constants/theme";
 import { AuthStackParamList } from "../../RootNavigator";
 import FamilyBottomNav from "../../components/FamilyBottomNav";
 import { api } from "../../api/api";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "MyBookings">;
-
 type BookingRow = {
   booking_id: string;
   family_fk: string;
@@ -30,18 +17,13 @@ type BookingRow = {
   requested_at: string;
   service_date: string;
   booking_status: "Requested" | "Accepted" | "Declined" | "Completed" | "Cancelled";
-
   has_complaint: boolean | null;
   has_review?: boolean | null;
-
   payment_status: string | null;
-
   caregiver_name?: string | null;
   caregiver_district?: string | null;
-
   family_name?: string | null;
   family_district?: string | null;
-
   caregiver_service_type?: string | null;
   caregiver_time_period?: string | null;
   caregiver_languages?: string | null;
@@ -49,16 +31,22 @@ type BookingRow = {
 
 type ComplaintCategory = "Punctuality" | "Safety Concern" | "Service Quality" | "Other";
 
+// Formats ISO date values into a readable date and time string for booking display
 function formatPrettyDate(iso: string) {
   const d = new Date(iso);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd} • ${hh}:${mi}`;
+
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+
+  return `${yyyy}-${mm}-${dd} • ${hours}:${minutes} ${ampm}`;
 }
 
+// Cleans nullable or placeholder values before rendering them in the UI
 function clean(v: any) {
   const s = String(v ?? "").trim();
   if (!s || s === "not_set" || s === "null" || s === "undefined") return "";
@@ -85,16 +73,22 @@ export default function MyBookingsScreen({ navigation }: Props) {
   const [reviewText, setReviewText] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
+  // Retrieves all bookings related to the logged-in family user
   const fetchBookings = useCallback(async () => {
     try {
+      // Requests the booking list from the backend service
       const res = await api.get("/booking/myBookings");
       setBookings(Array.isArray(res.data) ? res.data : []);
     } catch (err: any) {
       console.log("Fetch bookings error:", err?.response?.data || err?.message);
-      Alert.alert(t("error") || "Error", err?.response?.data?.message || (t("failed_load_bookings") || "Failed to load bookings."));
+      Alert.alert(
+        t("error"),
+        err?.response?.data?.message || t("failed_load_bookings")
+      );
     }
   }, [t]);
 
+  // Loads bookings when the screen is first opened
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -103,12 +97,14 @@ export default function MyBookingsScreen({ navigation }: Props) {
     })();
   }, [fetchBookings]);
 
+  // Reloads bookings through pull-to-refresh interaction
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchBookings();
     setRefreshing(false);
   }, [fetchBookings]);
 
+  // Creates a visual badge based on the current booking status
   const StatusBadge = ({ status }: { status: BookingRow["booking_status"] }) => {
     const bg =
       status === "Requested" ? "#FFF2E0" :
@@ -124,13 +120,21 @@ export default function MyBookingsScreen({ navigation }: Props) {
       status === "Declined" ? "#B91C1C" :
       "#374151";
 
+    const label =
+      status === "Requested" ? t("status_requested") :
+      status === "Accepted" ? t("accepted") :
+      status === "Completed" ? t("status_completed") :
+      status === "Declined" ? t("declined") :
+      t("status_cancelled");
+
     return (
       <View style={[styles.badge, { backgroundColor: bg }]}>
-        <Text style={[styles.badgeText, { color: txt }]}>{status}</Text>
+        <Text style={[styles.badgeText, { color: txt }]}>{label}</Text>
       </View>
     );
   };
 
+  // Opens the complaint modal and resets previous complaint input values
   const openComplaintModal = (b: BookingRow) => {
     setSelectedBooking(b);
     setComplaintCategory(null);
@@ -138,6 +142,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
     setShowComplaint(true);
   };
 
+  // Opens the rating modal and clears previous review input values
   const openRatingModal = (b: BookingRow) => {
     setSelectedBooking(b);
     setStars(0);
@@ -145,42 +150,61 @@ export default function MyBookingsScreen({ navigation }: Props) {
     setShowRating(true);
   };
 
+  // Confirms the cancellation action before updating the booking status
   const confirmCancel = (b: BookingRow) => {
-    Alert.alert(t("cancel_booking") || "Cancel booking?", t("cancel_booking_msg") || "This will mark the request as Cancelled.", [
-      { text: t("no") || "No", style: "cancel" },
-      {
-        text: t("yes_cancel") || "Yes, Cancel",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.put(`/booking/status/${b.booking_id}`, { status: "Cancelled" });
-            Alert.alert(t("cancelled") || "Cancelled", t("cancelled_msg") || "Booking was cancelled.");
-            await fetchBookings();
-          } catch (err: any) {
-            console.log("Cancel error:", err?.response?.data || err?.message);
-            Alert.alert(t("cancel_failed") || "Cancel failed", err?.response?.data?.message || (t("could_not_cancel") || "Could not cancel booking."));
-          }
+    Alert.alert(
+      t("cancel_booking"),
+      t("cancel_booking_msg"),
+      [
+        { text: t("no"), style: "cancel" },
+        {
+          text: t("yes_cancel"),
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Updates the selected booking status to Cancelled in the backend
+              await api.put(`/booking/status/${b.booking_id}`, { status: "Cancelled" });
+              Alert.alert(
+                t("cancelled"),
+                t("cancelled_msg")
+              );
+              await fetchBookings();
+            } catch (err: any) {
+              console.log("Cancel error:", err?.response?.data || err?.message);
+              Alert.alert(
+                t("cancel_failed"),
+                err?.response?.data?.message || t("could_not_cancel")
+              );
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
+  // Validates and submits a complaint linked to the selected booking
   const submitComplaint = async () => {
     if (!selectedBooking) return;
 
+    // Ensures a complaint category is selected before submission
     if (!complaintCategory) {
-      Alert.alert(t("select_category") || "Select a category", t("choose_issue_before_submit") || "Please choose an issue type before submitting.");
+      Alert.alert(
+        t("select_category"),
+        t("choose_issue_before_submit")
+      );
       return;
     }
 
     try {
       setSubmittingComplaint(true);
 
+      // Combines the selected category with the optional complaint description
       const reason =
         clean(complaintText)
           ? `${complaintCategory}: ${clean(complaintText)}`
           : `${complaintCategory}`;
 
+      // Sends the complaint record to the governance module
       await api.post("/governance/fileComplaint", {
         bookingId: selectedBooking.booking_id,
         reason,
@@ -191,27 +215,39 @@ export default function MyBookingsScreen({ navigation }: Props) {
       setComplaintCategory(null);
       setComplaintText("");
 
-      Alert.alert(t("complaint_submitted_title") || "Complaint submitted", t("complaint_submitted_msg") || "Your complaint was submitted successfully.");
+      Alert.alert(
+        t("complaint_submitted_title"),
+        t("complaint_submitted_msg")
+      );
       await fetchBookings();
     } catch (err: any) {
       console.log("Complaint submit error:", err?.response?.data || err?.message);
-      Alert.alert(t("failed") || "Failed", err?.response?.data?.message || (t("complaint_failed") || "Could not submit complaint."));
+      Alert.alert(
+        t("failed"),
+        err?.response?.data?.message || t("complaint_failed")
+      );
     } finally {
       setSubmittingComplaint(false);
     }
   };
 
+  // Validates and submits a rating and optional written review
   const submitReview = async () => {
     if (!selectedBooking) return;
 
+    // Requires at least one star rating before allowing submission
     if (stars < 1) {
-      Alert.alert(t("add_rating") || "Add a rating", t("select_star_msg") || "Please select at least 1 star.");
+      Alert.alert(
+        t("add_rating"),
+        t("select_star_msg")
+      );
       return;
     }
 
     try {
       setSubmittingReview(true);
 
+      // Sends rating and feedback data to the review service
       await api.post("/review/add", {
         bookingId: selectedBooking.booking_id,
         ratingScore: stars,
@@ -223,11 +259,17 @@ export default function MyBookingsScreen({ navigation }: Props) {
       setStars(0);
       setReviewText("");
 
-      Alert.alert(t("review_submitted_title") || "Review submitted", t("review_submitted_msg") || "Thanks! Your review was submitted.");
+      Alert.alert(
+        t("review_submitted_title"),
+        t("review_submitted_msg")
+      );
       await fetchBookings();
     } catch (err: any) {
       console.log("Review submit error:", err?.response?.data || err?.message);
-      Alert.alert(t("failed") || "Failed", err?.response?.data?.message || (t("review_failed") || "Could not submit review."));
+      Alert.alert(
+        t("failed"),
+        err?.response?.data?.message || t("review_failed")
+      );
     } finally {
       setSubmittingReview(false);
     }
@@ -240,7 +282,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
           <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
         </Pressable>
 
-        <Text style={styles.headerTitle}>{t("my_bookings") || "My Bookings"}</Text>
+        <Text style={styles.headerTitle}>{t("my_bookings")}</Text>
 
         <Pressable onPress={() => navigation.replace("Login", { role: "family" })} style={styles.headerBtn}>
           <Ionicons name="log-out-outline" size={22} color={theme.colors.muted} />
@@ -251,7 +293,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
         <View style={styles.center}>
           <ActivityIndicator />
           <Text style={{ marginTop: 10, color: theme.colors.muted, fontWeight: "700" }}>
-            {t("loading_bookings") || "Loading bookings..."}
+            {t("loading_bookings")}
           </Text>
         </View>
       ) : (
@@ -262,18 +304,24 @@ export default function MyBookingsScreen({ navigation }: Props) {
           {bookings.length === 0 ? (
             <View style={styles.emptyBox}>
               <Ionicons name="calendar-outline" size={28} color={theme.colors.muted} />
-              <Text style={styles.emptyTitle}>{t("no_bookings_yet") || "No bookings yet"}</Text>
-              <Text style={styles.emptySub}>{t("no_bookings_sub") || "Book a caregiver and your requests will appear here."}</Text>
+              <Text style={styles.emptyTitle}>{t("no_bookings_yet")}</Text>
+              <Text style={styles.emptySub}>{t("no_bookings_sub")}</Text>
             </View>
           ) : (
             bookings.map((b) => {
+              // Tracks whether the current booking card is expanded
               const open = openId === b.booking_id;
+
+              // Only requested or accepted bookings can be cancelled
               const canCancel = b.booking_status === "Requested" || b.booking_status === "Accepted";
 
-              const caregiverName = clean(b.caregiver_name) || (t("caregiver_generic") || "Caregiver");
+              const caregiverName = clean(b.caregiver_name) || t("caregiver_generic");
               const caregiverDistrict = clean(b.caregiver_district);
 
+              // Prevents duplicate complaints for the same booking
               const complaintLocked = b.has_complaint === true;
+
+              // Allows review submission only once after booking completion
               const canRate = b.booking_status === "Completed" && b.has_review !== true;
 
               return (
@@ -282,8 +330,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
                   onPress={() => setOpenId(open ? null : b.booking_id)}
                   style={styles.card}
                 >
-                  <View style={styles.row}>
-                    <View style={styles.avatar} />
+                  <View style={styles.topRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.name}>{caregiverName}</Text>
                       <Text style={styles.sub}>{formatPrettyDate(b.service_date)}</Text>
@@ -295,15 +342,15 @@ export default function MyBookingsScreen({ navigation }: Props) {
                   <View style={styles.line} />
 
                   <View style={styles.moneyRow}>
-                    <Text style={styles.mLabel}>{t("payment") || "PAYMENT"}</Text>
-                    <Text style={styles.money}>{b.payment_status ?? (t("na") || "N/A")}</Text>
+                    <Text style={styles.mLabel}>{t("payment")}</Text>
+                    <Text style={styles.money}>{b.payment_status ?? t("na")}</Text>
                   </View>
 
                   {open && (
                     <View style={styles.detailBox}>
-                      <Text style={styles.dTitle}>{t("booking_details") || "Booking Details"}</Text>
-                      <Text style={styles.dText}>{t("status") || "Status"}: {b.booking_status}</Text>
-                      <Text style={styles.dText}>{t("requested_at") || "Requested At"}: {formatPrettyDate(b.requested_at)}</Text>
+                      <Text style={styles.dTitle}>{t("booking_details")}</Text>
+                      <Text style={styles.dText}>{t("status")}: {b.booking_status}</Text>
+                      <Text style={styles.dText}>{t("requested_at")}: {formatPrettyDate(b.requested_at)}</Text>
 
                       <View style={{ height: 10 }} />
 
@@ -312,7 +359,9 @@ export default function MyBookingsScreen({ navigation }: Props) {
                           style={[styles.smallBtn, { borderColor: "#fecaca", backgroundColor: "#fff1f2" }]}
                           onPress={() => confirmCancel(b)}
                         >
-                          <Text style={[styles.smallBtnText, { color: "#b91c1c" }]}>{t("cancel_booking_btn") || "Cancel Booking"}</Text>
+                          <Text style={[styles.smallBtnText, { color: "#b91c1c" }]}>
+                            {t("cancel_booking_btn")}
+                          </Text>
                         </Pressable>
                       )}
 
@@ -322,7 +371,9 @@ export default function MyBookingsScreen({ navigation }: Props) {
                         onPress={() => openComplaintModal(b)}
                       >
                         <Text style={styles.smallBtnText}>
-                          {complaintLocked ? (t("complaint_already_filed") || "Complaint already filed") : (t("report_issue") || "Report Issue")}
+                          {complaintLocked
+                            ? t("complaint_already_filed")
+                            : t("report_issue")}
                         </Text>
                       </Pressable>
 
@@ -337,7 +388,9 @@ export default function MyBookingsScreen({ navigation }: Props) {
                           onPress={() => openRatingModal(b)}
                         >
                           <Text style={[styles.smallBtnText, { color: "white" }]}>
-                            {canRate ? (t("rate_review") || "Rate & Review") : (t("already_reviewed") || "Already reviewed")}
+                            {canRate
+                              ? t("rate_review")
+                              : t("already_reviewed")}
                           </Text>
                         </Pressable>
                       )}
@@ -354,6 +407,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
 
       <FamilyBottomNav active="bookings" navigation={navigation} />
 
+      {/* Bottom sheet for filing a complaint related to a booking */}
       <Modal visible={showComplaint} transparent animationType="slide" onRequestClose={() => setShowComplaint(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.sheet}>
@@ -361,8 +415,8 @@ export default function MyBookingsScreen({ navigation }: Props) {
               <Ionicons name="close" size={22} color={theme.colors.text} />
             </Pressable>
 
-            <Text style={styles.sheetTitleDanger}>{t("report_issue") || "Report Issue"}</Text>
-            <Text style={styles.sheetSubtitle}>{t("admins_respond_24h") || "Admins will investigate and respond within 24 hours."}</Text>
+            <Text style={styles.sheetTitleDanger}>{t("report_issue")}</Text>
+            <Text style={styles.sheetSubtitle}>{t("admins_respond_24h")}</Text>
 
             {(["Punctuality", "Safety Concern", "Service Quality", "Other"] as ComplaintCategory[]).map((c) => {
               const active = complaintCategory === c;
@@ -378,7 +432,9 @@ export default function MyBookingsScreen({ navigation }: Props) {
                   onPress={() => setComplaintCategory(c)}
                   style={[styles.choice, active && styles.choiceActive]}
                 >
-                  <Text style={[styles.choiceText, active && styles.choiceTextActive]}>{t(labelKey) || c}</Text>
+                  <Text style={[styles.choiceText, active && styles.choiceTextActive]}>
+                    {t(labelKey)}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -386,7 +442,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
             <TextInput
               value={complaintText}
               onChangeText={setComplaintText}
-              placeholder={t("complaint_desc_ph") || "Describe the issue (optional)..."}
+              placeholder={t("complaint_desc_ph")}
               placeholderTextColor="#9aa3af"
               multiline
               style={styles.reviewInput}
@@ -396,13 +452,14 @@ export default function MyBookingsScreen({ navigation }: Props) {
               {submittingComplaint ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.primaryBtnText}>{t("file_official_report") || "File Official Report"}</Text>
+                <Text style={styles.primaryBtnText}>{t("file_official_report")}</Text>
               )}
             </Pressable>
           </View>
         </View>
       </Modal>
 
+      {/* Bottom sheet for submitting a caregiver rating and written review */}
       <Modal visible={showRating} transparent animationType="slide" onRequestClose={() => setShowRating(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.sheet}>
@@ -410,8 +467,8 @@ export default function MyBookingsScreen({ navigation }: Props) {
               <Ionicons name="close" size={22} color={theme.colors.text} />
             </Pressable>
 
-            <Text style={styles.sheetTitle}>{t("how_was_care") || "How was the care?"}</Text>
-            <Text style={styles.sheetSubtitle}>{t("feedback_improves") || "Your feedback helps improve our community."}</Text>
+            <Text style={styles.sheetTitle}>{t("how_was_care")}</Text>
+            <Text style={styles.sheetSubtitle}>{t("feedback_improves")}</Text>
 
             <View style={styles.starsRow}>
               {Array.from({ length: 5 }).map((_, i) => {
@@ -432,7 +489,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
             <TextInput
               value={reviewText}
               onChangeText={setReviewText}
-              placeholder={t("write_brief_review") || "Write a brief review..."}
+              placeholder={t("write_brief_review")}
               placeholderTextColor="#9aa3af"
               multiline
               style={styles.reviewInput}
@@ -440,7 +497,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
 
             <View style={styles.sheetActions}>
               <Pressable onPress={() => setShowRating(false)} style={styles.secondaryBtn} disabled={submittingReview}>
-                <Text style={styles.secondaryBtnText}>{t("later") || "Later"}</Text>
+                <Text style={styles.secondaryBtnText}>{t("later")}</Text>
               </Pressable>
 
               <Pressable onPress={submitReview} style={[styles.primaryBtn, { flex: 1 }]} disabled={submittingReview}>
@@ -448,7 +505,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <Text style={styles.primaryBtnText}>{t("submit_review") || "Submit Review"}</Text>
+                    <Text style={styles.primaryBtnText}>{t("submit_review")}</Text>
                     <Ionicons name="send" size={18} color="#fff" />
                   </View>
                 )}
@@ -497,8 +554,14 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     marginBottom: 12,
   },
-  row: { flexDirection: "row", gap: 12, alignItems: "center" },
-  avatar: { width: 44, height: 44, borderRadius: 16, backgroundColor: "#EEF2F6" },
+
+  topRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
   name: { fontSize: 16, fontWeight: "900", color: theme.colors.text },
   sub: { marginTop: 2, color: theme.colors.muted, fontWeight: "700" },
   subSmall: { marginTop: 2, color: theme.colors.muted, fontWeight: "700", fontSize: 12 },

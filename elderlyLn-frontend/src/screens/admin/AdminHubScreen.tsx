@@ -9,6 +9,7 @@ import { theme } from "../../constants/theme";
 import { api } from "../../api/api"; 
 type Props = NativeStackScreenProps<AuthStackParamList, "AdminHub">;
 
+// Data shown in the caregiver verification queue
 type QueueItem = {
   id: string; 
   name: string; 
@@ -16,6 +17,7 @@ type QueueItem = {
   docsCount: number;
 };
 
+// Complaint details shown in the complaints tab
 type ComplaintItem = {
   complaint_id: string;
   status: "Submitted" | "Under Review" | "Closed" | string;
@@ -27,6 +29,7 @@ type ComplaintItem = {
 
 export default function AdminHubScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  // Switch between verification requests and complaints
   const [tab, setTab] = useState<"verification" | "complaints">("verification");
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -43,11 +46,12 @@ export default function AdminHubScreen({ navigation }: Props) {
   const fetchQueue = async () => {
     try {
       setLoadingQueue(true);
+      // Request the latest verification queue from the backend
       const res = await api.get("/governance/admin/verificationQueue");
       setQueue(res.data || []);
     } catch (e: any) {
       console.log("Queue error:", e?.response?.data || e?.message);
-      Alert.alert("Error", e?.response?.data?.message || "Failed to load verification queue");
+      Alert.alert(t("error_title"), e?.response?.data?.message || t("failed_load_verification_queue"));
     } finally {
       setLoadingQueue(false);
     }
@@ -56,39 +60,46 @@ export default function AdminHubScreen({ navigation }: Props) {
   const fetchComplaints = async () => {
     try {
       setLoadingComplaints(true);
+      // Request complaint data from the backend
       const res = await api.get("/governance/complaints");
       setComplaints(res.data || []);
     } catch (e: any) {
       console.log("Complaints error:", e?.response?.data || e?.message);
-      Alert.alert("Error", e?.response?.data?.message || "Failed to load complaints");
+      Alert.alert(t("error_title"), e?.response?.data?.message || t("failed_load_complaints"));
     } finally {
       setLoadingComplaints(false);
     }
   };
 
+  // Load both tabs when the screen is opened
   useEffect(() => {
     fetchQueue();
     fetchComplaints();
   }, []);
 
+  // Open the selected caregiver's verification details screen
   const openVerify = (caregiverId: string) => {
     navigation.navigate("VerifyCaregiver", { caregiverId });
   };
 
+  // Open the complaint resolution modal for the selected complaint
   const openResolveModal = (c: ComplaintItem) => {
     setSelectedComplaint(c);
     setShowDispute(true);
   };
 
+// Mark the complaint as resolved with an internal note
   const resolve = async () => {
     try {
       if (!selectedComplaint) return;
 
+      // Prevent resolving a complaint without a note
       if (!note.trim()) {
-        Alert.alert("Note required", "Please add a short resolution note.");
+        Alert.alert(t("note_required_title"), t("note_required_msg"));
         return;
       }
 
+      // Send the complaint resolution update to the backend
       await api.put(`/governance/resolveComplaint/${selectedComplaint.complaint_id}`, {
         resolutionNote: note.trim(),
         newStatus: "Closed",
@@ -101,11 +112,12 @@ export default function AdminHubScreen({ navigation }: Props) {
       Alert.alert(t("marked_resolved_demo"));
     } catch (e: any) {
       console.log("Resolve error:", e?.response?.data || e?.message);
-      Alert.alert("Error", e?.response?.data?.message || "Failed to resolve complaint");
+      Alert.alert(t("error_title"), e?.response?.data?.message || t("failed_resolve_complaint"));
     }
   };
 
   const renderQueueItem = ({ item, index }: { item: QueueItem; index: number }) => {
+    // Highlight the first queue item as the active card style 
     const active = index === 0;
     return (
       <Pressable onPress={() => openVerify(item.id)} style={[styles.queueCard, active && styles.queueActive]}>
@@ -116,7 +128,7 @@ export default function AdminHubScreen({ navigation }: Props) {
         <View style={{ flex: 1 }}>
           <Text style={styles.queueName}>{item.name}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 6 }}>
-            <Text style={styles.queueMeta}>{item.requestedAt ? "PENDING" : "PENDING"}</Text>
+            <Text style={styles.queueMeta}>{t("pending").toUpperCase()}</Text>
             <Text style={styles.queueDot}>•</Text>
             <Text style={styles.queueDocs}>
               {item.docsCount} {t("docs")}
@@ -129,6 +141,7 @@ export default function AdminHubScreen({ navigation }: Props) {
     );
   };
 
+  // Render each complaint card in the complaints tab 
   const renderComplaintItem = ({ item }: { item: ComplaintItem }) => {
     const isPending = item.status !== "Closed";
     return (
@@ -142,7 +155,7 @@ export default function AdminHubScreen({ navigation }: Props) {
         <Text style={styles.complaintDate}>{String(item.submitted_at).slice(0, 10)}</Text>
 
         <Text style={styles.family}>
-          {item.family_name ? item.family_name : "Family"} {item.caregiver_name ? `→ ${item.caregiver_name}` : ""}
+          {item.family_name ? item.family_name : t("family_generic")} {item.caregiver_name ? `→ ${item.caregiver_name}` : ""}
         </Text>
         <Text style={styles.summary} numberOfLines={2}>
           "{item.description}"
@@ -176,7 +189,8 @@ export default function AdminHubScreen({ navigation }: Props) {
 
         {headerRight}
       </View>
-
+ 
+      {/* //Tab buttons to switch between verification requests and complaints */}
       <View style={styles.segmentWrap}>
         <Pressable onPress={() => setTab("verification")} style={[styles.segmentBtn, tab === "verification" && styles.segmentActive]}>
           <Text style={[styles.segmentText, tab === "verification" && styles.segmentTextActive]}>{t("verification_queue")}</Text>
@@ -195,6 +209,7 @@ export default function AdminHubScreen({ navigation }: Props) {
             <ActivityIndicator />
           </View>
         ) : (
+          // Show caregivers waiting for admin verification
           <FlatList
             contentContainerStyle={{ padding: theme.spacing.xl, paddingBottom: 24 }}
             data={queue}
@@ -202,7 +217,7 @@ export default function AdminHubScreen({ navigation }: Props) {
             renderItem={renderQueueItem}
             ListEmptyComponent={
               <View style={{ paddingTop: 30, alignItems: "center" }}>
-                <Text style={{ color: theme.colors.muted, fontWeight: "800" }}>No pending verification requests</Text>
+                <Text style={{ color: theme.colors.muted, fontWeight: "800" }}>{t("no_pending_verification_requests")}</Text>
               </View>
             }
           />
@@ -212,6 +227,7 @@ export default function AdminHubScreen({ navigation }: Props) {
           <ActivityIndicator />
         </View>
       ) : (
+        //Show complaint records and allow admins to resolve them
         <FlatList
           contentContainerStyle={{ padding: theme.spacing.xl, paddingBottom: 24 }}
           data={complaints}
@@ -219,12 +235,13 @@ export default function AdminHubScreen({ navigation }: Props) {
           renderItem={renderComplaintItem}
           ListEmptyComponent={
             <View style={{ paddingTop: 30, alignItems: "center" }}>
-              <Text style={{ color: theme.colors.muted, fontWeight: "800" }}>No complaints yet</Text>
+              <Text style={{ color: theme.colors.muted, fontWeight: "800" }}>{t("no_complaints_yet")}</Text>
             </View>
           }
         />
       )}
 
+      {/* //Modal used to add an internal note before resolving a complaint */}
       <Modal visible={showDispute} transparent animationType="fade" onRequestClose={() => setShowDispute(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -248,7 +265,7 @@ export default function AdminHubScreen({ navigation }: Props) {
                 "{selectedComplaint?.description || "-"}"
               </Text>
               <Text style={{ marginTop: 8, fontWeight: "800", color: theme.colors.muted }}>
-                Status: {selectedComplaint?.status || "-"}
+                {t("status")}: {selectedComplaint?.status || "-"}
               </Text>
             </View>
 

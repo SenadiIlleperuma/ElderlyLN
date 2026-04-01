@@ -212,8 +212,6 @@
   "online": "ஆன்லைன்",
   "hi_name": "வணக்கம், {{name}}!",
   "total_earnings": "மொத்த வருமானம்",
-    "no_upcoming_shifts": "வரவிருக்கும் பணிநேரங்கள் இல்லை",
-"no_upcoming_shifts_sub": "ஏற்றுக்கொள்ளப்பட்ட முன்பதிவுகள் இங்கே தோன்றும்.",
   "this_month": "இந்த மாதம்",
   "jobs_done": "முடிந்த வேலைகள்",
   "visits": "வருகைகள்",
@@ -328,6 +326,8 @@
   "urgent_reports": "அவசர அறிக்கைகள்",
   "resolve_now": "இப்போது தீர்க்கவும்",
   "total_users": "மொத்த பயனர்கள்",
+  "no_upcoming_shifts": "வரவிருக்கும் பணிநேரங்கள் இல்லை",
+  "no_upcoming_shifts_sub": "ஏற்றுக்கொள்ளப்பட்ட முன்பதிவுகள் இங்கே தோன்றும்.",
   "active_care": "செயலில் பராமரிப்பு",
   "verification": "சரிபார்ப்பு",
   "daily_revenue": "தினசரி வருமானம்",
@@ -472,8 +472,8 @@
   "dash_value": "—",
 
   "nav_home": "முகப்பு",
-  "nav_search": "தேடல்",
-  "nav_bookings": "முன்பதிவுகள்",
-  "nav_alerts": "அறிவிப்புகள்",
-  "nav_profile": "சுயவிவரம்"
+"nav_search": "தேடல்",
+"nav_bookings": "முன்பதிவு",
+"nav_alerts": "அறிவிப்பு",
+"nav_profile": "சுயவிவரம்"
 }

@@ -1,15 +1,18 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, TextInput, Pressable, Alert, ActivityIndicator } from "react-native";
+import {View,Text,StyleSheet,TextInput,Pressable,Alert,ActivityIndicator,} from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import { AuthStackParamList } from "../../RootNavigator";
 import { theme } from "../../constants/theme";
 import { api } from "../../api/api";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
-const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase());
+// Simple email format validation before sending to server
+const isValidEmail = (email: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase());
 
 export default function LoginScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
@@ -18,33 +21,46 @@ export default function LoginScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
+  // Role-specific subtitles and labels based on the selected role
   const subtitle = useMemo(() => {
     if (role === "caregiver") return t("login_subtitle_caregiver");
     if (role === "admin") return t("login_subtitle_admin");
     return t("login_subtitle_family");
   }, [role, t]);
 
+  // Role-specific login label
+  const roleLoginLabel = useMemo(() => {
+    if (role === "caregiver") return t("caregiver_login");
+    if (role === "admin") return t("admin_login");
+    return t("family_login");
+  }, [role, t]);
+
+  // Navigate to the appropriate home screen based on user role
   const goToHomeByRole = (userRole: string) => {
     if (userRole === "family") navigation.reset({ index: 0, routes: [{ name: "FamilyHome" }] });
     else if (userRole === "caregiver") navigation.reset({ index: 0, routes: [{ name: "CaregiverHome" }] });
     else navigation.reset({ index: 0, routes: [{ name: "AdminHome" }] });
   };
 
+
   const onLogin = async () => {
     const e = email.trim().toLowerCase();
 
     if (!e || !password) {
-      Alert.alert("Error", "Please enter email and password.");
+      Alert.alert(t("error_title"), t("enter_email_password"));
       return;
     }
+    //stop invalid email addresses before calling the API
     if (!isValidEmail(e)) {
-      Alert.alert("Error", "Please enter a valid email.");
+      Alert.alert(t("error_title"), t("enter_valid_email"));
       return;
     }
 
     setLoading(true);
     try {
+      // send login request to the backend
       const res = await api.post("/auth/login", { email: e, password });
 
       const token = res.data?.token;
@@ -52,18 +68,20 @@ export default function LoginScreen({ navigation, route }: Props) {
       const userId = res.data?.user_id;
       const userEmail = res.data?.email || e;
 
+      //Backend return the required login data 
       if (!token || !userRole || !userId) {
-        Alert.alert("Error", "Invalid server response (missing token/role/user_id).");
+        Alert.alert(t("error_title"), t("invalid_server_response"));
         return;
       }
 
+      // Store toke for authenticated requests
       await AsyncStorage.setItem("token", token);
 
       let full_name = "";
       let district = "";
 
       try {
-        const me = await api.get("/auth/me");
+        const me = await api.get("/auth/me"); // Get extra user info after login, if available
         full_name = me.data?.full_name || "";
         district = me.data?.district || "";
       } catch (err) {
@@ -80,16 +98,17 @@ export default function LoginScreen({ navigation, route }: Props) {
 
       console.log("Login: saving user =", user);
 
+      // save the logged in user details to AsyncStorage
       await AsyncStorage.setItem("user", JSON.stringify(user));
 
       if (userRole !== role) {
-        Alert.alert("Notice", `You logged in as ${userRole}. Redirecting...`);
+        Alert.alert(t("notice_title"), t("redirecting_logged_in_as", { role: userRole }));
       }
 
       goToHomeByRole(userRole);
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "Login failed.";
-      Alert.alert("Login Failed", msg);
+      const msg = err?.response?.data?.message || err?.message || t("login_failed_default");
+      Alert.alert(t("login_failed_title"), msg);
     } finally {
       setLoading(false);
     }
@@ -98,11 +117,11 @@ export default function LoginScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <Pressable onPress={() => navigation.goBack()} style={{ paddingVertical: 10 }}>
-        <Text style={{ color: theme.colors.primary, fontWeight: "900" }}>← Back</Text>
+        <Text style={{ color: theme.colors.primary, fontWeight: "900" }}>← {t("back")}</Text>
       </Pressable>
 
       <View style={styles.panel}>
-        <Text style={styles.pill}>{role.toUpperCase()} LOGIN</Text>
+        <Text style={styles.pill}>{roleLoginLabel}</Text>
 
         <Text style={styles.h1}>{t("welcome_back")}</Text>
         <Text style={styles.p}>{subtitle}</Text>
@@ -111,7 +130,7 @@ export default function LoginScreen({ navigation, route }: Props) {
         <TextInput
           value={email}
           onChangeText={setEmail}
-          placeholder="name@example.com"
+          placeholder={t("placeholder_email")}
           placeholderTextColor={theme.colors.muted}
           style={styles.input}
           autoCapitalize="none"
@@ -119,17 +138,34 @@ export default function LoginScreen({ navigation, route }: Props) {
         />
 
         <Text style={[styles.label, { marginTop: 14 }]}>{t("password")}</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          placeholder="••••••••"
-          placeholderTextColor={theme.colors.muted}
-          style={styles.input}
-          secureTextEntry
-          editable={!loading}
-        />
+        <View style={styles.passwordWrap}>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••"
+            placeholderTextColor={theme.colors.muted}
+            style={styles.passwordInput}
+            secureTextEntry={!showPassword}
+            editable={!loading}
+          />
+          <Pressable
+            onPress={() => setShowPassword((prev) => !prev)} // Toggle password visibility
+            style={styles.eyeBtn}
+            disabled={loading}
+          >
+            <Ionicons
+              name={showPassword ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              color={theme.colors.muted}
+            />
+          </Pressable>
+        </View>
 
-        <Pressable onPress={onLogin} style={[styles.primaryBtn, loading && { opacity: 0.7 }]} disabled={loading}>
+        <Pressable
+          onPress={onLogin}
+          style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
+          disabled={loading}
+        >
           {loading ? <ActivityIndicator color="white" /> : <Text style={styles.primaryBtnText}>{t("sign_in")}</Text>}
         </Pressable>
 
@@ -159,6 +195,7 @@ const styles = StyleSheet.create({
   h1: { marginTop: 12, fontSize: 34, fontWeight: "900", color: theme.colors.text },
   p: { marginTop: 10, fontSize: 16, color: theme.colors.muted },
   label: { marginTop: 22, fontSize: 14, fontWeight: "800", color: theme.colors.text },
+
   input: {
     marginTop: 8,
     borderWidth: 1,
@@ -169,6 +206,30 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
   },
+
+  passwordWrap: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: "white",
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: theme.colors.text,
+  },
+  eyeBtn: {
+    width: 46,
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   primaryBtn: {
     marginTop: 18,
     backgroundColor: theme.colors.primary,

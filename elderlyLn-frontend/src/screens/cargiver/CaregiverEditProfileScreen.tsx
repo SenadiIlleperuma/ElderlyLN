@@ -1,23 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  Image,
-  Modal,
-} from "react-native";
+import { View,Text,StyleSheet,Pressable,ScrollView, TextInput, Alert, ActivityIndicator, Image,Modal,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-
 import { AuthStackParamList } from "../../RootNavigator";
 import { theme } from "../../constants/theme";
 import { api } from "../../api/api";
@@ -26,6 +14,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, "CaregiverEditProfile">;
 type Chip = { id: string; label: string };
 type DocType = "NIC" | "POLICE" | "CERTIFICATE" | "OTHER";
 
+// Mapping of care category IDs to their display labels
 const CARE_CATEGORY_MAP: Record<string, string> = {
   elderly: "Elderly care",
   child: "Child care",
@@ -35,12 +24,14 @@ const CARE_CATEGORY_MAP: Record<string, string> = {
   domestic: "Domestic support",
 };
 
+// Map language ids to readable values used in the database
 const LANG_MAP: Record<string, string> = {
   si: "Sinhala",
   ta: "Tamil",
   en: "English",
 };
 
+// Predefined working slot options
 const WORK_SLOT_OPTIONS = [
   "Half-day- අර්ධ දවසේ සේවය",
   "Full-day - සම්පූර්ණ දවසේ සේවය",
@@ -66,7 +57,7 @@ function normalizeStatus(value: string) {
     .toUpperCase()
     .replace(/\s+/g, "_");
 }
-
+// Format file size in KB to a more readable format (KB or MB)
 function formatKb(kb: number | null) {
   if (!kb || kb < 0) return "";
   if (kb >= 1024) return `${(kb / 1024).toFixed(1)} MB`;
@@ -81,7 +72,7 @@ function formatDate(v: string) {
     return "-";
   }
 }
-
+// Show a cleaner label for document types
 function documentTypeLabel(type: string) {
   const t = normalizeStatus(type);
   if (t === "NIC") return "NIC";
@@ -91,6 +82,7 @@ function documentTypeLabel(type: string) {
   return type || "-";
 }
 
+// Build the banner style and message based on profile verification status
 function statusMeta(profileStatus: string, t: any) {
   const s = normalizeStatus(profileStatus);
 
@@ -139,7 +131,7 @@ function statusMeta(profileStatus: string, t: any) {
 
 export default function CaregiverEditProfileScreen({ navigation }: Props) {
   const { t } = useTranslation();
-
+// Localized lists for care categories and languages options shown in selectable chips
   const careCategoriesList: Chip[] = useMemo(
     () => [
       { id: "elderly", label: t("care_elderly") },
@@ -151,7 +143,6 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
     ],
     [t]
   );
-
   const languagesList: Chip[] = useMemo(
     () => [
       { id: "si", label: t("lang_si") },
@@ -186,13 +177,13 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [showDocTypeModal, setShowDocTypeModal] = useState(false);
   const [showPhotoOptionsModal, setShowPhotoOptionsModal] = useState(false);
-
+// Toggle selection for care categories and languages, only if in edit mode
   const toggle = (id: string, selected: string[], setSelected: (x: string[]) => void) => {
     if (!editMode) return;
     if (selected.includes(id)) setSelected(selected.filter((x) => x !== id));
     else setSelected([...selected, id]);
   };
-
+// Determine if documents can be edited or submitted based on profile status and document presence
   const normalizedStatus = normalizeStatus(profileStatus);
   const isPendingVerification =
     normalizedStatus === "PENDING_VERIFICATION" || normalizedStatus === "PENDING";
@@ -202,6 +193,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
   const docsLocked = isVerified || (isPendingVerification && docs.length > 0);
 
   const hasAnyDocument = docs.length > 0;
+  // Allow submission only when documents exist and the profile is eligible
   const canSubmitVerification =
     hasAnyDocument &&
     !isVerified &&
@@ -209,7 +201,9 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
     !docsUploading &&
     !(isPendingVerification && !isRejected);
 
-  const loadProfile = async () => {
+
+    const loadProfile = async () => {
+      // Request caregivers's current profile details
     const res = await api.get("/profile/caregiver/me");
     const c = res.data;
 
@@ -220,19 +214,23 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
     setProfileStatus(c.profile_status ?? "");
     setProfileImageUrl(c.profile_image_url ?? "");
 
+    // Map backend qualifications to a comma-separated string
     const dbQuals: string[] = Array.isArray(c.qualifications) ? c.qualifications : [];
     setQualificationsText(dbQuals.join(", "));
 
+  // Convert backend care categories into selected UI chip ids
     const dbCategories: string[] = Array.isArray(c.care_category) ? c.care_category : [];
     const uiCategories = Object.keys(CARE_CATEGORY_MAP).filter((k) =>
       dbCategories.includes(CARE_CATEGORY_MAP[k])
     );
     setSelectedCareCategories(uiCategories);
 
+    // Convert backend languages into selected UI chip ids
     const dbLangs: string[] = Array.isArray(c.languages_spoken) ? c.languages_spoken : [];
     const uiLangs = Object.keys(LANG_MAP).filter((k) => dbLangs.includes(LANG_MAP[k]));
     setSelectedLanguages(uiLangs);
 
+    // Match the saved availability value to a predefined option or custom text
     const dbWorkSlot = c.availability_period ?? "";
     if (WORK_SLOT_OPTIONS.includes(dbWorkSlot)) {
       setWorkSlot(dbWorkSlot);
@@ -249,6 +247,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
   const loadDocs = async () => {
     try {
       setDocsLoading(true);
+      // Request caregiver documents and latest verification status
       const res = await api.get("/documents/caregiver/me");
 
       const caregiver = res.data?.caregiver;
@@ -266,7 +265,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
       setDocsLoading(false);
     }
   };
-
+  // Load profile details and uploaded documents when the screen opens
   useEffect(() => {
     (async () => {
       try {
@@ -280,10 +279,12 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
     })();
   }, [t]);
 
+  // Validate and save edited caregiver profile details
   const onSave = async () => {
     const expected_rate = rate.trim() ? Number(rate) : null;
     const experience_years = expYears.trim() ? Number(expYears) : null;
 
+    // Display name and location are required
     if (!displayName.trim() || !location.trim()) {
       Alert.alert(t("failed_title"), t("display_name_required_msg"));
       return;
@@ -312,6 +313,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
       .map((x) => x.trim())
       .filter(Boolean);
 
+    // Determine the final availability value 
     const finalAvailabilityPeriod =
       workSlot === "Other" ? otherWorkSlotText.trim() : workSlot || null;
 
@@ -322,6 +324,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
 
     try {
       setSaving(true);
+      // Send the updated caregiver profile to the backend
       await api.put("/profile/caregiver/me", {
         full_name: displayName.trim(),
         district: location.trim(),
@@ -342,15 +345,16 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
       setSaving(false);
     }
   };
-
+// Pick and upload profile image
   const pickAndUploadProfileImage = async () => {
     try {
+      // Request permission to access photos
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
         Alert.alert(t("permission_required"), t("allow_photo_access"));
         return;
       }
-
+      // Launch image library for selection
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -377,6 +381,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
 
       setImageUploading(true);
 
+      // Upload the selected profile image using multipart form data
       await api.post("/profile/caregiver/profileImage", form, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -392,7 +397,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
       setImageUploading(false);
     }
   };
-
+// Remove the current profile image
   const removeProfileImage = async () => {
     try {
       setImageUploading(true);
@@ -411,12 +416,14 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
     }
   };
 
+  // Pick and upload a document
   const pickAndUpload = async (document_type: DocType) => {
     if (!editMode) {
       Alert.alert(t("edit_mode_title"), t("edit_mode_upload_msg"));
       return;
     }
 
+    // Stop uploads when documents are already verified or under review
     if (docsLocked) {
       Alert.alert(
         t("locked_title"),
@@ -454,6 +461,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
         type: mimeType,
       } as any);
 
+      //Upload the selected verification document to the backend
       await api.post("/documents/caregiver/upload", form, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -470,6 +478,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
     }
   };
 
+  // Send uploaded documents to the admin for verification
   const submitForVerification = async () => {
     if (!editMode) {
       Alert.alert(t("edit_mode_title"), t("edit_mode_submit_msg"));
@@ -481,6 +490,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
       return;
     }
 
+    // At least one document must be uploaded
     if (!hasAnyDocument) {
       Alert.alert(t("error_title"), "Please upload at least one document before submitting.");
       return;
@@ -488,6 +498,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
 
     try {
       setSubmitting(true);
+      // Submit the caregiver profile for admin review
       await api.post("/documents/caregiver/submit");
       Alert.alert(t("submitted_title"), t("sent_to_admin_msg"));
       await Promise.all([loadProfile(), loadDocs()]);
@@ -500,7 +511,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
       setSubmitting(false);
     }
   };
-
+// Build status banner shown above the document section
   const banner = statusMeta(profileStatus, t);
 
   if (loading) {
@@ -551,6 +562,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
             )}
           </View>
 
+            {/* Main button to chose   */}
           <Pressable
             onPress={() => {
               if (!editMode || imageUploading) return;
@@ -657,6 +669,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
         </Text>
         <View style={styles.chipsWrap}>
           {WORK_SLOT_OPTIONS.map((slot) => {
+            // Determine if the current slot is selected
             const active = workSlot === slot;
             const label =
               slot === "Half-day- අර්ධ දවසේ සේවය"
@@ -669,6 +682,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
                 ? t("live_in")
                 : t("other");
 
+            
             return (
               <Pressable
                 key={slot}
@@ -713,7 +727,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
           <Text style={styles.docsHint}>
             {t("upload_document_hint")}
           </Text>
-
+          {/* Upload document button */}
           <Pressable
             onPress={() => setShowDocTypeModal(true)}
             style={[
@@ -740,7 +754,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
                     : "✗ Upload at least one document to submit"}
                 </Text>
               </View>
-
+              {/* // Submit for verification button, only enabled when eligible */}
               <Pressable
                 onPress={submitForVerification}
                 style={[
@@ -763,6 +777,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
             </>
           )}
 
+
           <Text style={[styles.sectionTitle, { marginTop: 16, fontSize: 14 }]}>
             {t("uploaded_documents")}
           </Text>
@@ -777,6 +792,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
             </Text>
           ) : (
             <View style={{ marginTop: 10, gap: 10 }}>
+              {/* // Show each uploaded document with basic file details and status  */}
               {docs.map((d) => (
                 <View key={d.document_id} style={styles.docListItem}>
                   <View style={{ flex: 1 }}>
@@ -811,6 +827,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
         </View>
       )}
 
+      {/* // Modal for selecting document type when uploading a new document */}
       <Modal
         visible={showDocTypeModal}
         transparent
@@ -843,7 +860,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
-
+      {/* Modal for profile photo options (upload new or remove existing) */}
       <Modal
         visible={showPhotoOptionsModal}
         transparent
@@ -882,7 +899,10 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  safe: { 
+    flex: 1, 
+    backgroundColor: theme.colors.bg 
+  },
 
   header: {
     height: 56,
@@ -893,12 +913,28 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
     justifyContent: "space-between",
   },
-  headerBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 18, fontWeight: "900", color: theme.colors.text },
+  headerBtn: { 
+    width: 40, 
+    height: 40, 
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  headerTitle: { 
+    fontSize: 18, 
+    fontWeight: "900", 
+    color: theme.colors.text 
+  },
 
-  content: { padding: theme.spacing.xl, paddingBottom: 140 },
+  content: { 
+    padding: theme.spacing.xl, 
+    paddingBottom: 140 
+  },
 
-  photoWrap: { alignSelf: "center", marginTop: 10, marginBottom: 16 },
+  photoWrap: { 
+    alignSelf: "center", 
+    marginTop: 10, 
+    marginBottom: 16 
+  },
   photo: {
     width: 140,
     height: 140,
@@ -908,7 +944,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  photoImg: { width: "100%", height: "100%" },
+  photoImg: { 
+    width: "100%", 
+    height: "100%" 
+  },
   photoFallback: {
     width: "100%",
     height: "100%",
@@ -929,7 +968,11 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
 
-  label: { marginTop: 10, fontWeight: "900", color: theme.colors.muted },
+  label: { 
+    marginTop: 10, 
+    fontWeight: "900", 
+    color: theme.colors.muted 
+  },
   input: {
     marginTop: 8,
     backgroundColor: "#fff",
@@ -941,13 +984,26 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: theme.colors.text,
   },
-  inputLocked: { backgroundColor: "#F3F4F6" },
-
-  gridRow: { flexDirection: "row", gap: 12, marginTop: 6 },
-
-  sectionTitle: { marginTop: 16, fontSize: 16, fontWeight: "900", color: theme.colors.text },
-
-  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 12 },
+  inputLocked: { 
+    backgroundColor: "#F3F4F6" 
+  },
+  gridRow: { 
+    flexDirection: "row", 
+    gap: 12,
+    marginTop: 6
+ },
+  sectionTitle: { 
+    marginTop: 16, 
+    fontSize: 16, 
+    fontWeight: "900", 
+    color: theme.colors.text 
+  },
+  chipsWrap: { 
+    flexDirection: "row", 
+    flexWrap: "wrap", 
+    gap: 10,
+    marginTop: 12 
+  },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -956,13 +1012,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  chipActive: { borderColor: theme.colors.primary, backgroundColor: "#EEF2FF" },
-  chipText: { fontWeight: "900", color: theme.colors.muted, fontSize: 12 },
-  chipTextActive: { color: theme.colors.primary },
+  chipActive: { 
+    borderColor: theme.colors.primary, 
+    backgroundColor: "#EEF2FF" 
+},
+  chipText: { 
+    fontWeight: "900", 
+    color: theme.colors.muted, 
+    fontSize: 12 
+  },
+  chipTextActive: { 
+    color: theme.colors.primary
+   },
 
-  statusBanner: { marginTop: 16, borderWidth: 1, borderRadius: 18, padding: 14 },
-  statusTitle: { fontWeight: "900", fontSize: 14 },
-  statusHint: { marginTop: 6, color: theme.colors.muted, fontWeight: "800", lineHeight: 20 },
+  statusBanner: { 
+    marginTop: 16, 
+    borderWidth: 1, 
+    borderRadius: 18, 
+    padding: 14 
+  },
+  statusTitle: { 
+    fontWeight: "900", 
+    fontSize: 14 
+  },
+  statusHint: { 
+    marginTop: 6, 
+    color: theme.colors.muted, 
+    fontWeight: "800", lineHeight: 20 
+  },
 
   docsCard: {
     marginTop: 12,
@@ -972,7 +1049,11 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     padding: 14,
   },
-  docsHint: { color: theme.colors.muted, fontWeight: "800", lineHeight: 20 },
+  docsHint: { 
+    color: theme.colors.muted, 
+    fontWeight: "800", 
+    lineHeight: 20 
+  },
 
   uploadMainBtn: {
     marginTop: 14,
@@ -984,7 +1065,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  uploadMainBtnText: { color: "#fff", fontWeight: "900" },
+  uploadMainBtnText: { 
+    color: "#fff", 
+    fontWeight: "900"
+   },
 
   requirementBox: {
     marginTop: 12,
@@ -1009,7 +1093,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  submitText: { fontWeight: "900", color: "#fff" },
+  submitText: { 
+    fontWeight: "900", 
+    color: "#fff" 
+  },
 
   docListItem: {
     flexDirection: "row",
@@ -1021,9 +1108,21 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
   },
-  docListName: { fontWeight: "900", color: theme.colors.text },
-  docListMeta: { marginTop: 4, color: theme.colors.muted, fontWeight: "700", fontSize: 12 },
-  docListStatus: { color: "#2563EB", fontWeight: "900", fontSize: 12 },
+  docListName: { 
+    fontWeight: "900", 
+    color: theme.colors.text 
+  },
+  docListMeta: {
+     marginTop: 4, 
+     color: theme.colors.muted, 
+     fontWeight: "700",
+      fontSize: 12 
+    },
+  docListStatus: {
+     color: "#2563EB", 
+     fontWeight: "900", 
+     fontSize: 12 
+    },
 
   bottomBar: {
     position: "absolute",
@@ -1044,7 +1143,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  saveText: { color: "#fff", fontWeight: "900" },
+  saveText: { 
+    color: "#fff", 
+    fontWeight: "900"
+   },
 
   modalBackdrop: {
     flex: 1,

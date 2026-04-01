@@ -1,20 +1,11 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-  Modal,
-} from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView,  ActivityIndicator, Modal,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { AuthStackParamList, BookingRow } from "../../RootNavigator";
 import { theme } from "../../constants/theme";
 import CaregiverBottomNav from "../../components/CaregiverBottomNav";
@@ -31,18 +22,21 @@ type Shift = {
   time: string;
 };
 
+// Language options for the app
 const LANGUAGES = [
   { code: "en", label: "English", short: "EN" },
   { code: "si", label: "සිංහල", short: "SI" },
   { code: "ta", label: "தமிழ்", short: "TA" },
 ];
 
+// Clean values before showing in the dashboard
 function cleanText(v: any) {
   const s = String(v ?? "").trim();
   if (!s || s === "not_set" || s === "null" || s === "undefined") return "";
   return s;
 }
 
+// Format service date into a month and day display
 function formatShiftDate(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return { month: "—", day: "—" };
@@ -51,16 +45,16 @@ function formatShiftDate(iso: string) {
   return { month, day };
 }
 
+// Format service date into a time display
 function formatShiftTime(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Normalize booking status for consistent comparisons
 function normStatus(s: any) {
-  return String(s ?? "")
-    .trim()
-    .toLowerCase();
+  return String(s ?? "").trim().toLowerCase();
 }
 
 function isSameMonth(d: Date, ref: Date) {
@@ -71,7 +65,7 @@ function toNumber(v: any) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
-
+// Format a number as Sri Lankan Rupees
 function formatLKR(n: number) {
   const rounded = Math.round(n);
   return `Rs ${rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
@@ -85,9 +79,11 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
   const [loadingBookings, setLoadingBookings] = useState<boolean>(true);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
+  // Determine the current language for display in the header
   const currentLanguage =
     LANGUAGES.find((lang) => lang.code === i18n.language) || LANGUAGES[0];
 
+    // Load the caregiver's saved name for the greeting message
   useEffect(() => {
     (async () => {
       const u = (await getUser()) as any;
@@ -96,9 +92,11 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
     })();
   }, []);
 
+  // Load all bookings linked to the caregiver
   const loadBookings = useCallback(async () => {
     try {
       setLoadingBookings(true);
+      // Request caregiver booking data from the backend
       const res = await api.get("/booking/myBookings");
       const data = Array.isArray(res.data) ? res.data : [];
 
@@ -121,19 +119,21 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
       }));
 
       setBookings(mapped);
-    } catch (e) {
+    } catch {
       setBookings([]);
     } finally {
       setLoadingBookings(false);
     }
   }, []);
 
+// Load bookings when the screen is focused
   useFocusEffect(
     useCallback(() => {
       loadBookings();
     }, [loadBookings])
   );
 
+  // Change the app's language and save the preference
   const handleChangeLanguage = async (langCode: string) => {
     try {
       await i18n.changeLanguage(langCode);
@@ -143,12 +143,13 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
       console.log("Language change error:", error);
     }
   };
-
+// Logout the caregiver and reset navigation to the role selection screen
   const onLogout = async () => {
     await AsyncStorage.multiRemove(["token", "user", "role", "session"]);
     navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
   };
 
+  // Calculate summary values for requests, earnings, and upcoming shifts based on the loaded bookings
   const {
     jobRequestsCount,
     completedCount,
@@ -159,12 +160,14 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
     const now = new Date();
     const thisMonth = now;
 
+    // Split bookings by status for dashboard display
     const requested = bookings.filter((b) => normStatus(b.booking_status) === "requested");
     const completed = bookings.filter((b) => normStatus(b.booking_status) === "completed");
     const accepted = bookings.filter((b) => normStatus(b.booking_status) === "accepted");
 
+    
     const totalEarn = completed.reduce((sum, b) => sum + toNumber(b.caregiver_expected_rate), 0);
-
+    
     const monthEarn = completed.reduce((sum, b) => {
       const d = new Date(b.service_date);
       if (Number.isNaN(d.getTime())) return sum;
@@ -172,6 +175,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
       return sum + toNumber(b.caregiver_expected_rate);
     }, 0);
 
+    // Keep only future accepted bookings and show the next few shifts
     const upcomingAccepted = accepted
       .filter((b) => {
         const d = new Date(b.service_date);
@@ -217,6 +221,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
           </View>
         </View>
 
+      {/* Dropdown for language selection */}
         <Modal
           transparent
           visible={languageModalVisible}
@@ -259,14 +264,14 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
             <View style={styles.bigDivider} />
 
             <View style={styles.bigBottom}>
-              <View>
+              <View style={styles.bottomStat}>
                 <Text style={styles.smallLabel}>{t("this_month")}</Text>
                 <Text style={styles.smallValue}>
                   {loadingBookings ? "—" : `+ ${formatLKR(monthEarnings)}`}
                 </Text>
               </View>
 
-              <View>
+              <View style={styles.bottomStat}>
                 <Text style={styles.smallLabel}>{t("jobs_done")}</Text>
                 <Text style={styles.smallValue}>
                   {loadingBookings ? "—" : `${completedCount} ${t("visits")}`}
@@ -281,6 +286,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.tilesRow}>
+          {/* Quick navigation to the caregiver's incoming job requests */}
           <Pressable style={styles.tile} onPress={() => navigation.navigate("JobRequests")}>
             <View style={styles.tileIconWrap}>
               <Ionicons name="briefcase-outline" size={22} color={theme.colors.primary} />
@@ -290,7 +296,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
               {loadingBookings ? "—" : `${jobRequestsCount} ${t("new_match")}`}
             </Text>
           </Pressable>
-
+          {/* Quick navigation to edit caregiver profile details */}
           <Pressable style={styles.tile} onPress={() => navigation.navigate("CaregiverEditProfile")}>
             <View style={styles.tileIconWrap}>
               <Ionicons name="person-outline" size={22} color="#64748B" />
@@ -314,8 +320,8 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
                 <Text style={styles.month}>—</Text>
                 <Text style={styles.day}>—</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.shiftTitle}>{t("loading_requests") || "Loading..."}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.shiftTitle}>{t("loading")}</Text>
                 <Text style={styles.shiftTime}> </Text>
               </View>
               <View style={styles.clock}>
@@ -329,7 +335,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
                 <Text style={styles.day}>—</Text>
               </View>
 
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.shiftTitle}>{t("no_upcoming_shifts")}</Text>
                 <Text style={styles.shiftTime}>{t("no_upcoming_shifts_sub")}</Text>
               </View>
@@ -339,6 +345,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
               </View>
             </View>
           ) : (
+            // Show the nearest accepted bookings as upcoming shifts
             upcomingShifts.map((s) => (
               <View key={s.id} style={styles.shiftCard}>
                 <View style={styles.dateBox}>
@@ -346,7 +353,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
                   <Text style={styles.day}>{s.day}</Text>
                 </View>
 
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.shiftTitle}>{s.title}</Text>
                   <Text style={styles.shiftTime}>{s.time}</Text>
                 </View>
@@ -378,13 +385,16 @@ const styles = StyleSheet.create({
 
   headerRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: 12,
   },
   headerTitle: {
+    flex: 1,
     fontSize: 26,
     fontWeight: "900",
     color: theme.colors.text,
+    lineHeight: 32,
   },
   headerActions: {
     flexDirection: "row",
@@ -453,6 +463,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontWeight: "900",
     color: "#334155",
+    lineHeight: 22,
   },
 
   bigCard: {
@@ -467,12 +478,14 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     fontWeight: "900",
     letterSpacing: 1,
+    lineHeight: 20,
   },
   bigValue: {
     marginTop: 8,
     color: "white",
     fontSize: 34,
     fontWeight: "900",
+    lineHeight: 40,
   },
   bigDivider: {
     height: 1,
@@ -482,17 +495,24 @@ const styles = StyleSheet.create({
   bigBottom: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 16,
+  },
+  bottomStat: {
+    flex: 1,
+    minWidth: 0,
   },
   smallLabel: {
     color: "rgba(255,255,255,0.45)",
     fontWeight: "900",
     fontSize: 12,
+    lineHeight: 18,
   },
   smallValue: {
     marginTop: 6,
     color: "white",
     fontWeight: "900",
     fontSize: 16,
+    lineHeight: 22,
   },
 
   iconBox: {
@@ -531,28 +551,38 @@ const styles = StyleSheet.create({
   tileTitle: {
     fontWeight: "900",
     color: theme.colors.text,
+    textAlign: "center",
+    lineHeight: 22,
   },
   tileSub: {
     marginTop: 6,
     color: theme.colors.muted,
     fontWeight: "800",
     fontSize: 12,
+    textAlign: "center",
+    lineHeight: 18,
   },
 
   sectionRow: {
     marginTop: 22,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 10,
   },
   sectionTitle: {
+    flex: 1,
     fontSize: 20,
     fontWeight: "900",
     color: theme.colors.text,
+    lineHeight: 28,
   },
   link: {
     color: theme.colors.primary,
     fontWeight: "900",
+    textAlign: "right",
+    flexShrink: 1,
+    lineHeight: 22,
   },
 
   shiftCard: {
@@ -572,23 +602,27 @@ const styles = StyleSheet.create({
   month: {
     color: "#94A3B8",
     fontWeight: "900",
+    lineHeight: 18,
   },
   day: {
     marginTop: 2,
     fontSize: 20,
     fontWeight: "900",
     color: theme.colors.text,
+    lineHeight: 24,
   },
 
   shiftTitle: {
     fontWeight: "900",
     color: theme.colors.text,
     fontSize: 16,
+    lineHeight: 22,
   },
   shiftTime: {
     marginTop: 6,
     color: theme.colors.muted,
     fontWeight: "800",
+    lineHeight: 20,
   },
 
   clock: {

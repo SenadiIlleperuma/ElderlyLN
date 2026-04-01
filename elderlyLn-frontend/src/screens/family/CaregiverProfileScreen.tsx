@@ -4,12 +4,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
-
 import { theme } from "../../constants/theme";
 import { AuthStackParamList } from "../../RootNavigator";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "CaregiverProfile">;
 
+// Clean and safely display values from different caregiver data fields
 const displayField = (v: any) => {
   if (v === null || v === undefined) return "-";
   if (Array.isArray(v)) {
@@ -25,7 +25,7 @@ const displayField = (v: any) => {
 
   return s;
 };
-
+// Convert various list formats into a clean string array
 const parseList = (raw: any): string[] => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean);
@@ -36,17 +36,40 @@ const parseList = (raw: any): string[] => {
   return s.split(",").map((x) => x.trim()).filter(Boolean);
 };
 
+// Normalize status values to a consistent format for badge display
+function normalizeStatus(value: any) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+}
+// Generate initials for avatar display based on the caregiver's name
+function getInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 export default function CaregiverProfileScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   const { caregiver } = route.params;
+// Determine display name with fallbacks and generate initials for avatar
+  const displayName = displayField(caregiver?.name ?? caregiver?.full_name);
+  const initials = getInitials(displayName === "-" ? t("caregiver_generic") : displayName);
 
+  // Read rating from available fields
   const ratingSafe =
     typeof caregiver?.rating === "number"
       ? caregiver.rating
       : typeof caregiver?.avg_rating === "number"
       ? caregiver.avg_rating
       : 0;
-
+  // Read reviews count from available fields
   const reviewsSafe =
     typeof caregiver?.reviewsCount === "number"
       ? caregiver.reviewsCount
@@ -54,6 +77,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
       ? caregiver.reviews_count
       : 0;
 
+  // Read experience years from available fields
   const expSafe =
     typeof caregiver?.experienceYears === "number"
       ? caregiver.experienceYears
@@ -65,6 +89,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
       ? Number(caregiver.experience_years) || 0
       : 0;
 
+  // Read service type from available fields
   const serviceTypeRaw =
     caregiver?.caregiver_service_type ??
     caregiver?.careServiceType ??
@@ -73,6 +98,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
     caregiver?.serviceType ??
     caregiver?.caregiverServiceType;
 
+  // Read time period from available fields
   const timePeriodRaw =
     caregiver?.caregiver_time_period ??
     caregiver?.preferredTime ??
@@ -82,6 +108,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
     caregiver?.timePeriod ??
     caregiver?.preferredTimePeriod;
 
+  // Read languages from available fields
   const languagesRaw =
     caregiver?.caregiver_languages ??
     caregiver?.languagesSpoken ??
@@ -89,6 +116,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
     caregiver?.languages ??
     caregiver?.languagesSpokenList;
 
+  // Read expected rate from available fields
   const expectedRate =
     caregiver?.ratePerHour ??
     caregiver?.rate_per_hour ??
@@ -98,6 +126,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
     caregiver?.rate ??
     0;
 
+  // Build caregiver specialties from display candidate fields
   const specialtiesArr: string[] = useMemo(() => {
     const raw =
       caregiver?.specialties ??
@@ -109,6 +138,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
     return parseList(raw);
   }, [caregiver]);
 
+  // Build the caregiver qualifications list from available fields
   const qualsArr: string[] = useMemo(() => {
     const raw =
       caregiver?.qualifications ??
@@ -120,12 +150,35 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
     return parseList(raw);
   }, [caregiver]);
 
+// Build the caregiver verification badge list
+  const badgesArr: string[] = useMemo(() => {
+    const raw =
+      caregiver?.verification_badges ??
+      caregiver?.verification_badge ??
+      caregiver?.badges;
+
+    return parseList(raw);
+  }, [caregiver]);
+
+  // Normalize the caregiver verification status
+  const profileStatus = normalizeStatus(
+    caregiver?.profile_status ?? caregiver?.status ?? caregiver?.verification_status
+  );
+  // Determine the text for the verification badge
+  const badgeText =
+    badgesArr.length > 0
+      ? badgesArr[0]
+      : profileStatus === "VERIFIED"
+      ? t("verified")
+      : "";
+  // Build the about text from available fields
   const aboutText =
     displayField(
       caregiver?.about ??
         (specialtiesArr.length ? specialtiesArr.join(", ") : t("experienced_caregiver"))
-    ) || "Experienced caregiver";
+    ) || t("experienced_caregiver");
 
+  // Open booking screen with the selected caregiver's details
   const onBookNow = () => {
     navigation.navigate("BookService", { caregiver });
   };
@@ -150,10 +203,18 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
 
           <View style={styles.heroBody}>
             <View style={styles.avatarWrap}>
-              <Ionicons name="person-circle" size={82} color="#98A2B3" />
+              <Text style={styles.avatarInitials}>{initials}</Text>
             </View>
 
-            <Text style={styles.name}>{displayField(caregiver?.name ?? caregiver?.full_name)}</Text>
+            <Text style={styles.name}>{displayName}</Text>
+
+            {badgeText ? (
+              <View style={styles.badgeWrap}>
+                <Ionicons name="shield-checkmark" size={14} color="#166534" />
+                <Text style={styles.badgeText}>{badgeText}</Text>
+              </View>
+            ) : null}
+
             <Text style={styles.sub}>
               {displayField(caregiver?.district)} • {expSafe} {t("yrs_exp")}
             </Text>
@@ -245,7 +306,10 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  safe: { 
+    flex: 1, 
+    backgroundColor: theme.colors.bg 
+  },
 
   header: {
     height: 56,
@@ -255,7 +319,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  headerBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  headerBtn: { 
+    width: 40, 
+    height: 40, 
+    alignItems: "center", 
+    justifyContent: "center"
+   },
   headerTitle: {
     flex: 1,
     textAlign: "center",
@@ -263,9 +332,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.colors.text,
   },
-
-  content: { padding: theme.spacing.xl },
-
+  content: { 
+    padding: theme.spacing.xl 
+  },
   hero: {
     backgroundColor: "white",
     borderRadius: theme.radius.xl,
@@ -273,9 +342,13 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     overflow: "hidden",
   },
-  heroTop: { height: 120, backgroundColor: theme.colors.primary },
-  heroBody: { padding: theme.spacing.xl },
-
+  heroTop: { 
+    height: 120, 
+    backgroundColor: theme.colors.primary
+   },
+  heroBody: { 
+    padding: theme.spacing.xl 
+  },
   avatarWrap: {
     width: 92,
     height: 92,
@@ -286,10 +359,43 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
-
-  name: { marginTop: 12, fontSize: 26, fontWeight: "900", color: theme.colors.text },
-  sub: { marginTop: 4, fontSize: 14, color: theme.colors.muted, fontWeight: "700" },
+  avatarInitials: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: theme.colors.primary,
+  },
+  name: { 
+    marginTop: 12, 
+    fontSize: 26, 
+    fontWeight: "900", 
+    color: theme.colors.text 
+  },
+  badgeWrap: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    backgroundColor: "#DCFCE7",
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  badgeText: {
+    color: "#166534",
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  sub: { 
+    marginTop: 8, 
+    fontSize: 14, 
+    color: theme.colors.muted, 
+    fontWeight: "700" 
+  },
 
   metricsRow: {
     marginTop: 16,
@@ -300,9 +406,20 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     paddingVertical: 14,
   },
-  metric: { alignItems: "flex-start", gap: 4 },
-  metricLabel: { fontSize: 12, color: theme.colors.muted, fontWeight: "900" },
-  metricValue: { fontSize: 16, color: theme.colors.text, fontWeight: "900" },
+  metric: { 
+    alignItems: "flex-start", 
+    gap: 4 
+  },
+  metricLabel: { 
+    fontSize: 12, 
+    color: theme.colors.muted, 
+    fontWeight: "900" 
+  },
+  metricValue: { 
+    fontSize: 16, 
+    color: theme.colors.text, 
+    fontWeight: "900" 
+  },
 
   infoGrid: {
     marginTop: 16,
@@ -313,14 +430,39 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: 12,
   },
-  infoItem: { gap: 3 },
-  infoLabel: { fontSize: 12, color: theme.colors.muted, fontWeight: "900" },
-  infoValue: { fontSize: 14, color: theme.colors.text, fontWeight: "800" },
+  infoItem: { 
+    gap: 3 
+  },
+  infoLabel: { 
+    fontSize: 12, 
+    color: theme.colors.muted, 
+    fontWeight: "900" 
+  },
+  infoValue: { 
+    fontSize: 14, 
+    color: theme.colors.text, 
+    fontWeight: "800" 
+  },
 
-  sectionTitle: { marginTop: 18, fontSize: 14, fontWeight: "900", color: theme.colors.text },
-  bodyText: { marginTop: 8, fontSize: 15, lineHeight: 22, color: theme.colors.muted, fontWeight: "700" },
-
-  chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 10 },
+  sectionTitle: { 
+    marginTop: 18, 
+    fontSize: 14, 
+    fontWeight: "900", 
+    color: theme.colors.text 
+  },
+  bodyText: {
+    marginTop: 8,
+    fontSize: 15,
+    lineHeight: 22,
+    color: theme.colors.muted,
+    fontWeight: "700",
+  },
+  chipsRow: { 
+    flexDirection: "row", 
+    flexWrap: "wrap",
+    gap: 10, 
+    marginTop: 10 
+    },
   chip: {
     backgroundColor: "#EFF6FF",
     borderWidth: 1,
@@ -329,7 +471,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
   },
-  chipText: { color: theme.colors.primary, fontWeight: "900", fontSize: 13 },
+  chipText: { 
+    color: theme.colors.primary, 
+    fontWeight: "900", 
+    fontSize: 13 
+  },
 
   qualRow: {
     flexDirection: "row",
@@ -352,8 +498,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  qualText: { flex: 1, fontSize: 15, fontWeight: "800", color: theme.colors.text },
-
+  qualText: { 
+    flex: 1, 
+    fontSize: 15, 
+    fontWeight: "800", 
+    color: theme.colors.text 
+  },
   bottomBar: {
     position: "absolute",
     left: 0,
@@ -373,5 +523,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  bookBtnText: { color: "white", fontSize: 16, fontWeight: "900" },
+  bookBtnText: { 
+    color: "white", 
+    fontSize: 16, 
+    fontWeight: "900"
+   },
 });

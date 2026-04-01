@@ -13,9 +13,11 @@ export default function BookingCard({
   type: string;
   status: BookingStatus;
 }) {
+  // Determines whether the current booking should use upcoming styling
   const isUpcoming = status === "UPCOMING";
 
   return (
+    // Reusable booking summary card used in booking-related screens
     <View style={styles.card}>
       <View style={styles.left}>
         <View style={styles.avatar}>

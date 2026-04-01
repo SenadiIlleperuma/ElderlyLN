@@ -15,6 +15,7 @@ export default function CategoryCard({
   onPress: () => void;
 }) {
   return (
+    // Reusable category card used for quick selection actions
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.iconWrap}>
         <Ionicons name={icon} size={18} color={theme.colors.primary} />
