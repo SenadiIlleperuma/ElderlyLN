@@ -40,6 +40,8 @@ const WORK_SLOT_OPTIONS = [
   "Other",
 ];
 
+const REQUIRED_DOC_TYPES: DocType[] = ["NIC", "POLICE", "CERTIFICATE", "OTHER"];
+
 type DocRow = {
   document_id: string;
   document_type: string;
@@ -73,17 +75,27 @@ function formatDate(v: string) {
   }
 }
 // Show a cleaner label for document types
-function documentTypeLabel(type: string) {
-  const t = normalizeStatus(type);
-  if (t === "NIC") return "NIC";
-  if (t === "POLICE") return "Police Clearance";
-  if (t === "CERTIFICATE") return "Certificate";
-  if (t === "OTHER") return "Other Document";
+function documentTypeLabel(type: string, t: any) {
+  const tpe = normalizeStatus(type);
+  if (tpe === "NIC") return t("document_nic");
+  if (tpe === "POLICE") return t("document_police_clearance");
+  if (tpe === "CERTIFICATE") return t("document_certificate");
+  if (tpe === "OTHER") return t("document_other");
   return type || "-";
 }
 
+function documentStatusLabel(status: string, t: any) {
+  const s = normalizeStatus(status);
+  if (s === "UPLOADED") return t("uploaded_status");
+  if (s === "UNDER_REVIEW") return t("under_review_status");
+  if (s === "REJECTED") return t("rejected_status");
+  if (s === "APPROVED" || s === "VERIFIED") return t("approved_status");
+  if (s === "PENDING" || s === "PENDING_VERIFICATION") return t("pending_verification");
+  return status || "-";
+}
+
 // Build the banner style and message based on profile verification status
-function statusMeta(profileStatus: string, t: any) {
+function statusMeta(profileStatus: string, hasDocuments: boolean, t: any) {
   const s = normalizeStatus(profileStatus);
 
   if (s === "VERIFIED") {
@@ -97,7 +109,7 @@ function statusMeta(profileStatus: string, t: any) {
     };
   }
 
-  if (s === "PENDING_VERIFICATION" || s === "PENDING") {
+  if ((s === "PENDING_VERIFICATION" || s === "PENDING") && hasDocuments) {
     return {
       title: t("pending_verification"),
       hint: t("waiting_admin_review"),
@@ -190,16 +202,26 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
   const isVerified = normalizedStatus === "VERIFIED";
   const isRejected = normalizedStatus === "REJECTED";
 
-  const docsLocked = isVerified || (isPendingVerification && docs.length > 0);
+  const uploadedDocTypes = useMemo(
+    () => [...new Set(docs.map((d) => normalizeStatus(d.document_type)).filter(Boolean))],
+    [docs]
+  );
 
-  const hasAnyDocument = docs.length > 0;
+  const uploadedRequiredCount = REQUIRED_DOC_TYPES.filter((type) =>
+    uploadedDocTypes.includes(type)
+  ).length;
+
+  const hasAllRequiredDocuments = uploadedRequiredCount === REQUIRED_DOC_TYPES.length;
+
+  const docsLocked = isVerified;
+
   // Allow submission only when documents exist and the profile is eligible
   const canSubmitVerification =
-    hasAnyDocument &&
+    hasAllRequiredDocuments &&
     !isVerified &&
     !submitting &&
     !docsUploading &&
-    !(isPendingVerification && !isRejected);
+    !isPendingVerification;
 
 
     const loadProfile = async () => {
@@ -469,10 +491,23 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
       });
 
       setShowDocTypeModal(false);
-      Alert.alert(t("success_title"), `${documentTypeLabel(document_type)} uploaded.`);
+      Alert.alert(t("success_title"), `${documentTypeLabel(document_type, t)} ${t("uploaded_successfully_short")}`);
       await Promise.all([loadDocs(), loadProfile()]);
     } catch (e: any) {
       Alert.alert(t("error_title"), e?.response?.data?.message || t("upload_failed"));
+    } finally {
+      setDocsUploading(false);
+    }
+  };
+
+  const deleteDocument = async (documentId: string) => {
+    try {
+      setDocsUploading(true);
+      await api.delete(`/documents/caregiver/${documentId}`);
+      Alert.alert(t("success_title"), t("document_deleted_successfully"));
+      await Promise.all([loadDocs(), loadProfile()]);
+    } catch (e: any) {
+      Alert.alert(t("error_title"), e?.response?.data?.message || t("delete_failed"));
     } finally {
       setDocsUploading(false);
     }
@@ -491,8 +526,8 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
     }
 
     // At least one document must be uploaded
-    if (!hasAnyDocument) {
-      Alert.alert(t("error_title"), "Please upload at least one document before submitting.");
+    if (!hasAllRequiredDocuments) {
+      Alert.alert(t("error_title"), t("upload_all_required_documents"));
       return;
     }
 
@@ -512,7 +547,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
     }
   };
 // Build status banner shown above the document section
-  const banner = statusMeta(profileStatus, t);
+  const banner = statusMeta(profileStatus, docs.length > 0, t);
 
   if (loading) {
     return (
@@ -740,18 +775,18 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
             <Text style={styles.uploadMainBtnText}>{t("upload_document")}</Text>
           </Pressable>
 
-          {!isVerified && editMode && (
+          {!isVerified && editMode && !isPendingVerification && (
             <>
               <View style={styles.requirementBox}>
                 <Text
                   style={[
                     styles.requirementText,
-                    { color: hasAnyDocument ? "#16A34A" : "#EF4444" },
+                    { color: hasAllRequiredDocuments ? "#16A34A" : "#EF4444" },
                   ]}
                 >
-                  {hasAnyDocument
-                    ? "✓ At least one document uploaded"
-                    : "✗ Upload at least one document to submit"}
+                  {hasAllRequiredDocuments
+                    ? `✓ ${t("all_required_documents_uploaded")}`
+                    : `✗ ${t("required_documents_progress", { uploaded: uploadedRequiredCount, total: REQUIRED_DOC_TYPES.length })}`}
                 </Text>
               </View>
               {/* // Submit for verification button, only enabled when eligible */}
@@ -771,7 +806,7 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
                   <Ionicons name="send-outline" size={18} color="#fff" />
                 )}
                 <Text style={styles.submitText}>
-                  {isRejected ? "Resubmit for Verification" : t("submit_for_verification")}
+                  {isRejected ? t("resubmit_for_verification") : t("submit_for_verification")}
                 </Text>
               </Pressable>
             </>
@@ -793,20 +828,48 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
           ) : (
             <View style={{ marginTop: 10, gap: 10 }}>
               {/* // Show each uploaded document with basic file details and status  */}
-              {docs.map((d) => (
-                <View key={d.document_id} style={styles.docListItem}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.docListName}>{d.file_name}</Text>
-                    <Text style={styles.docListMeta}>
-                      {documentTypeLabel(d.document_type)} • {formatKb(d.file_size_kb)} •{" "}
-                      {formatDate(d.uploaded_at)}
-                    </Text>
+              {docs.map((d) => {
+                const docUnderReview = normalizeStatus(d.verification_status) === "UNDER_REVIEW";
+                const showDelete = editMode && !isVerified && !docUnderReview;
+
+                return (
+                  <View key={d.document_id} style={styles.docListItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.docListName}>{d.file_name}</Text>
+                      <Text style={styles.docListMeta}>
+                        {documentTypeLabel(d.document_type, t)} • {formatKb(d.file_size_kb)} •{" "}
+                        {formatDate(d.uploaded_at)}
+                      </Text>
+                    </View>
+
+                    {showDelete ? (
+                      <Pressable
+                        onPress={() =>
+                          Alert.alert(
+                            t("delete_document_title"),
+                            t("delete_document_confirm"),
+                            [
+                              { text: t("cancel"), style: "cancel" },
+                              {
+                                text: t("delete"),
+                                style: "destructive",
+                                onPress: () => deleteDocument(d.document_id),
+                              },
+                            ]
+                          )
+                        }
+                        style={styles.deleteDocBtn}
+                      >
+                        <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                      </Pressable>
+                    ) : (
+                      <Text style={styles.docListStatus}>
+                        {documentStatusLabel(d.verification_status, t)}
+                      </Text>
+                    )}
                   </View>
-                  <Text style={styles.docListStatus}>
-                    {normalizeStatus(d.verification_status)}
-                  </Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
         </View>
@@ -839,19 +902,19 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
             <Text style={styles.modalTitle}>{t("choose_document_type")}</Text>
 
             <Pressable onPress={() => pickAndUpload("NIC")} style={styles.modalOption}>
-              <Text style={styles.modalOptionText}>NIC</Text>
+              <Text style={styles.modalOptionText}>{t("document_nic")}</Text>
             </Pressable>
 
             <Pressable onPress={() => pickAndUpload("POLICE")} style={styles.modalOption}>
-              <Text style={styles.modalOptionText}>Police Clearance</Text>
+              <Text style={styles.modalOptionText}>{t("document_police_clearance")}</Text>
             </Pressable>
 
             <Pressable onPress={() => pickAndUpload("CERTIFICATE")} style={styles.modalOption}>
-              <Text style={styles.modalOptionText}>Certificate</Text>
+              <Text style={styles.modalOptionText}>{t("document_certificate")}</Text>
             </Pressable>
 
             <Pressable onPress={() => pickAndUpload("OTHER")} style={styles.modalOption}>
-              <Text style={styles.modalOptionText}>Other Document</Text>
+              <Text style={styles.modalOptionText}>{t("document_other")}</Text>
             </Pressable>
 
             <Pressable onPress={() => setShowDocTypeModal(false)} style={styles.modalCloseBtn}>
@@ -873,14 +936,14 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
 
             <Pressable onPress={pickAndUploadProfileImage} style={styles.modalOption}>
               <Text style={styles.modalOptionText}>
-                {profileImageUrl ? "Change Photo" : "Upload Photo"}
+                {profileImageUrl ? t("change_photo") : t("upload_photo")}
               </Text>
             </Pressable>
 
             {!!profileImageUrl && (
               <Pressable onPress={removeProfileImage} style={styles.modalOption}>
                 <Text style={[styles.modalOptionText, { color: "#DC2626" }]}>
-                  Remove Photo
+                  {t("remove_photo")}
                 </Text>
               </Pressable>
             )}
@@ -1122,6 +1185,14 @@ const styles = StyleSheet.create({
      color: "#2563EB", 
      fontWeight: "900", 
      fontSize: 12 
+    },
+  deleteDocBtn: {
+     width: 38,
+     height: 38,
+     borderRadius: 12,
+     backgroundColor: "#FEF2F2",
+     alignItems: "center",
+     justifyContent: "center"
     },
 
   bottomBar: {
