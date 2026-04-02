@@ -63,6 +63,29 @@ router.get("/caregiver/me", async (req, res) => {
   }
 });
 
+// DELETE /api/documents/caregiver/:documentId
+router.delete("/caregiver/:documentId", async (req, res) => {
+  try {
+    // Only caregivers can delete their own documents
+    if (req.user.role !== "caregiver") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const result = await documentsService.deleteMyCaregiverDocument(
+      req.user.user_id,
+      req.params.documentId
+    );
+
+    return res.json({
+      message: "Document deleted successfully",
+      result,
+    });
+  } catch (e) {
+    console.error("Delete caregiver document error:", e);
+    return res.status(400).json({ message: e.message });
+  }
+});
+
 // POST /api/documents/caregiver/submit
 router.post("/caregiver/submit", async (req, res) => {
   try {
