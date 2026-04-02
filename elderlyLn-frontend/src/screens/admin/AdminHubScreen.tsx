@@ -27,6 +27,23 @@ type ComplaintItem = {
   caregiver_name?: string;
 };
 
+function normalizeText(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/["']/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizeStatus(value: string) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+}
+
 export default function AdminHubScreen({ navigation }: Props) {
   const { t } = useTranslation();
   // Switch between verification requests and complaints
@@ -42,6 +59,20 @@ export default function AdminHubScreen({ navigation }: Props) {
   const [selectedComplaint, setSelectedComplaint] = useState<ComplaintItem | null>(null);
 
   const complaintsCount = complaints.length;
+
+  const getComplaintStatusLabel = (status: string) => {
+    const normalized = normalizeStatus(status);
+    if (normalized === "SUBMITTED") return t("submitted");
+    if (normalized === "UNDER_REVIEW") return t("under_review");
+    if (normalized === "CLOSED") return t("closed");
+    return status || "-";
+  };
+
+  const getComplaintReasonLabel = (description: string) => {
+    const key = `complaint_reason_${normalizeText(description)}`;
+    const translated = t(key);
+    return translated === key ? description || "-" : translated;
+  };
 
   const fetchQueue = async () => {
     try {
@@ -143,7 +174,11 @@ export default function AdminHubScreen({ navigation }: Props) {
 
   // Render each complaint card in the complaints tab 
   const renderComplaintItem = ({ item }: { item: ComplaintItem }) => {
-    const isPending = item.status !== "Closed";
+    const normalizedStatus = normalizeStatus(item.status);
+    const isPending = normalizedStatus !== "CLOSED";
+    const complaintReason = getComplaintReasonLabel(item.description);
+    const statusLabel = getComplaintStatusLabel(item.status);
+
     return (
       <Pressable onPress={() => openResolveModal(item)} style={styles.complaintCard}>
         <View style={[styles.pendingPill, !isPending && { backgroundColor: "#DCFCE7" }]}>
@@ -158,7 +193,10 @@ export default function AdminHubScreen({ navigation }: Props) {
           {item.family_name ? item.family_name : t("family_generic")} {item.caregiver_name ? `→ ${item.caregiver_name}` : ""}
         </Text>
         <Text style={styles.summary} numberOfLines={2}>
-          "{item.description}"
+          "{complaintReason}"
+        </Text>
+        <Text style={styles.summaryStatus}>
+          {t("status")}: {statusLabel}
         </Text>
       </Pressable>
     );
@@ -262,10 +300,10 @@ export default function AdminHubScreen({ navigation }: Props) {
             <View style={styles.summaryBox}>
               <Text style={styles.summaryLabel}>{t("complaint_summary")}</Text>
               <Text style={styles.summaryText} numberOfLines={4}>
-                "{selectedComplaint?.description || "-"}"
+                "{getComplaintReasonLabel(selectedComplaint?.description || "-")}"
               </Text>
-              <Text style={{ marginTop: 8, fontWeight: "800", color: theme.colors.muted }}>
-                {t("status")}: {selectedComplaint?.status || "-"}
+              <Text style={styles.summaryStatusText}>
+                {t("status")}: {getComplaintStatusLabel(selectedComplaint?.status || "-")}
               </Text>
             </View>
 
@@ -275,6 +313,7 @@ export default function AdminHubScreen({ navigation }: Props) {
               placeholder={t("add_internal_note")}
               placeholderTextColor="#9aa3af"
               multiline
+              textAlignVertical="top"
               style={styles.input}
             />
 
@@ -291,7 +330,9 @@ export default function AdminHubScreen({ navigation }: Props) {
               </Pressable>
 
               <Pressable onPress={resolve} style={styles.resolveBtn}>
-                <Text style={styles.resolveText}>{t("mark_resolved")}</Text>
+                <Text style={styles.resolveText} numberOfLines={2}>
+                  {t("mark_resolved")}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -323,9 +364,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
   },
-  segmentBtn: { flex: 1, paddingVertical: 12, borderRadius: 14, alignItems: "center" },
+  segmentBtn: { flex: 1, paddingVertical: 12, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   segmentActive: { backgroundColor: "#fff" },
-  segmentText: { fontWeight: "900", color: theme.colors.muted },
+  segmentText: { fontWeight: "900", color: theme.colors.muted, textAlign: "center" },
   segmentTextActive: { color: theme.colors.text },
 
   queueCard: {
@@ -410,6 +451,11 @@ const styles = StyleSheet.create({
     color: theme.colors.muted, 
     fontWeight: "700" 
   },
+  summaryStatus: {
+    marginTop: 8,
+    color: theme.colors.muted,
+    fontWeight: "800",
+  },
 
   modalBackdrop: { 
     flex: 1, 
@@ -461,6 +507,11 @@ const styles = StyleSheet.create({
     fontWeight: "800", 
     color: "#B91C1C" 
   },
+  summaryStatusText: {
+    marginTop: 8,
+    fontWeight: "800",
+    color: theme.colors.muted,
+  },
 
   input: { 
     marginTop: 14, 
@@ -480,26 +531,37 @@ const styles = StyleSheet.create({
   },
   closeBtn: { 
     flex: 1, 
-    height: 52, 
+    minHeight: 52, 
     borderRadius: 16, 
     backgroundColor: "#F3F4F6", 
     alignItems: "center", 
-    justifyContent: "center"
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
    },
   closeText: { 
     fontWeight: "900", 
-    color: theme.colors.muted 
+    color: theme.colors.muted,
+    textAlign: "center",
+    width: "100%",
+    lineHeight: 20,
   },
   resolveBtn: { 
     flex: 1, 
-    height: 52, 
+    minHeight: 52, 
     borderRadius: 16, 
     backgroundColor: "#16A34A", 
     alignItems: "center", 
-    justifyContent: "center" 
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   resolveText: { 
     fontWeight: "900", 
-    color: "#fff" 
+    color: "#fff",
+    textAlign: "center",
+    width: "100%",
+    lineHeight: 20,
+    includeFontPadding: false,
   },
 });
