@@ -16,6 +16,7 @@ router.get("/me", authenticateToken, async (req, res) => {
     return res.status(200).json({
       notifications,
       unreadCount,
+      serverTime: new Date().toISOString(),
     });
   } catch (error) {
     console.error("Get notifications error:", error);
@@ -67,6 +68,7 @@ router.patch("/read-all", authenticateToken, async (req, res) => {
     return res.status(200).json({
       message: "All notifications marked as read.",
       updatedCount: updated.length,
+      notifications: updated,
     });
   } catch (error) {
     console.error("Mark all notifications read error:", error);

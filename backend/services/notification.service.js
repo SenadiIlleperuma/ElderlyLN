@@ -17,10 +17,20 @@ async function createNotification({
       message,
       type,
       related_entity_type,
-      related_entity_id
+      related_entity_id,
+      created_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *;
+    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    RETURNING
+      notification_id,
+      user_fk,
+      title,
+      message,
+      type,
+      related_entity_type,
+      related_entity_id,
+      is_read,
+      created_at;
   `;
 
   const values = [
@@ -33,7 +43,13 @@ async function createNotification({
   ];
 
   const result = await db.query(query, values);
-  return result.rows[0];
+
+  return {
+    ...result.rows[0],
+    created_at: result.rows[0]?.created_at
+      ? new Date(result.rows[0].created_at).toISOString()
+      : null,
+  };
 }
 
 // Create many notifications at once
@@ -65,11 +81,15 @@ async function getNotificationsForUser(userId) {
       created_at
     FROM notification
     WHERE user_fk = $1
-    ORDER BY created_at DESC;
+    ORDER BY created_at DESC, notification_id DESC;
   `;
 
   const result = await db.query(query, [userId]);
-  return result.rows;
+
+  return result.rows.map((row) => ({
+    ...row,
+    created_at: row.created_at ? new Date(row.created_at).toISOString() : null,
+  }));
 }
 
 // Get only unread count
@@ -92,11 +112,28 @@ async function markAsRead(notificationId, userId) {
     SET is_read = TRUE
     WHERE notification_id = $1
       AND user_fk = $2
-    RETURNING *;
+    RETURNING
+      notification_id,
+      user_fk,
+      title,
+      message,
+      type,
+      related_entity_type,
+      related_entity_id,
+      is_read,
+      created_at;
   `;
 
   const result = await db.query(query, [notificationId, userId]);
-  return result.rows[0];
+
+  if (!result.rows[0]) return null;
+
+  return {
+    ...result.rows[0],
+    created_at: result.rows[0].created_at
+      ? new Date(result.rows[0].created_at).toISOString()
+      : null,
+  };
 }
 
 // Mark all notifications as read
@@ -106,11 +143,24 @@ async function markAllAsRead(userId) {
     SET is_read = TRUE
     WHERE user_fk = $1
       AND is_read = FALSE
-    RETURNING *;
+    RETURNING
+      notification_id,
+      user_fk,
+      title,
+      message,
+      type,
+      related_entity_type,
+      related_entity_id,
+      is_read,
+      created_at;
   `;
 
   const result = await db.query(query, [userId]);
-  return result.rows;
+
+  return result.rows.map((row) => ({
+    ...row,
+    created_at: row.created_at ? new Date(row.created_at).toISOString() : null,
+  }));
 }
 
 // Delete one notification
@@ -119,11 +169,28 @@ async function deleteNotification(notificationId, userId) {
     DELETE FROM notification
     WHERE notification_id = $1
       AND user_fk = $2
-    RETURNING *;
+    RETURNING
+      notification_id,
+      user_fk,
+      title,
+      message,
+      type,
+      related_entity_type,
+      related_entity_id,
+      is_read,
+      created_at;
   `;
 
   const result = await db.query(query, [notificationId, userId]);
-  return result.rows[0];
+
+  if (!result.rows[0]) return null;
+
+  return {
+    ...result.rows[0],
+    created_at: result.rows[0].created_at
+      ? new Date(result.rows[0].created_at).toISOString()
+      : null,
+  };
 }
 
 // Send notification to all admins

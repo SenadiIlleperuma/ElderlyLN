@@ -3,6 +3,7 @@ const { supabase } = require("../utils/supabaseClient");
 const notificationService = require("./notification.service");
 
 const ALLOWED_TYPES = ["NIC", "POLICE", "CERTIFICATE", "OTHER"];
+const REQUIRED_TYPES = ["NIC", "POLICE", "CERTIFICATE", "OTHER"];
 
 // Normalizes status text.
 function normalizeStatus(value) {
@@ -47,6 +48,29 @@ async function saveCaregiverDocument({ userId, documentType, file }) {
 
   if (profileStatus === "VERIFIED") {
     throw new Error("You are already verified. Re-upload is not allowed right now.");
+  }
+
+  const existingQ = `
+    SELECT
+      document_id,
+      verification_status
+    FROM caregiver_document
+    WHERE caregiver_fk = $1
+      AND UPPER(TRIM(document_type)) = $2
+    ORDER BY uploaded_at DESC, document_id DESC
+  `;
+  const existingRes = await db.query(existingQ, [caregiverId, type]);
+
+  const lockedExisting = existingRes.rows.find(
+    (row) => normalizeStatus(row.verification_status) === "UNDER_REVIEW"
+  );
+
+  if (lockedExisting) {
+    throw new Error("This document is under review. You cannot replace it right now.");
+  }
+
+  for (const row of existingRes.rows) {
+    await db.query(`DELETE FROM caregiver_document WHERE document_id = $1`, [row.document_id]);
   }
 
   const bucket = process.env.SUPABASE_BUCKET;
@@ -150,6 +174,57 @@ async function listMyCaregiverDocuments(userId) {
   };
 }
 
+async function deleteMyCaregiverDocument(userId, documentId) {
+  const caregiver = await getCaregiverProfileByUserId(userId);
+  const caregiverId = caregiver.caregiver_id;
+  const profileStatus = normalizeStatus(caregiver.profile_status);
+
+  if (profileStatus === "VERIFIED") {
+    throw new Error("You are already verified. Deleting documents is not allowed right now.");
+  }
+
+  const findQ = `
+    SELECT
+      document_id,
+      caregiver_fk,
+      verification_status
+    FROM caregiver_document
+    WHERE document_id = $1
+      AND caregiver_fk = $2
+    LIMIT 1
+  `;
+  const findRes = await db.query(findQ, [documentId, caregiverId]);
+
+  if (!findRes.rows[0]) {
+    throw new Error("Document not found.");
+  }
+
+  const docStatus = normalizeStatus(findRes.rows[0].verification_status);
+
+  if (docStatus === "UNDER_REVIEW") {
+    throw new Error("This document is under review. You cannot delete it right now.");
+  }
+
+  const deleteQ = `
+    DELETE FROM caregiver_document
+    WHERE document_id = $1
+      AND caregiver_fk = $2
+    RETURNING
+      document_id,
+      caregiver_fk,
+      document_type,
+      file_url,
+      file_name,
+      file_size_kb,
+      mime_type,
+      verification_status,
+      uploaded_at
+  `;
+  const deletedRes = await db.query(deleteQ, [documentId, caregiverId]);
+
+  return deletedRes.rows[0];
+}
+
 // Lists docs for admin view
 async function listCaregiverDocumentsByCaregiverId(caregiverId) {
   const caregiverQ = `
@@ -226,8 +301,18 @@ async function submitForVerification(userId) {
   `;
   const docsRes = await db.query(docsQ, [caregiverId]);
 
-  if (docsRes.rows.length === 0) {
-    throw new Error("Please upload at least one document before submitting for verification.");
+  const uploadedTypes = [
+    ...new Set(
+      docsRes.rows.map((doc) => String(doc.document_type || "").toUpperCase().trim())
+    ),
+  ];
+
+  const missingTypes = REQUIRED_TYPES.filter((type) => !uploadedTypes.includes(type));
+
+  if (missingTypes.length > 0) {
+    throw new Error(
+      `Please upload all required documents before submitting. Missing: ${missingTypes.join(", ")}`
+    );
   }
 
   try {
@@ -286,6 +371,7 @@ async function submitForVerification(userId) {
 module.exports = {
   saveCaregiverDocument,
   listMyCaregiverDocuments,
+  deleteMyCaregiverDocument,
   listCaregiverDocumentsByCaregiverId,
   submitForVerification,
 };

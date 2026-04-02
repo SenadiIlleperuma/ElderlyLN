@@ -44,6 +44,16 @@ function formatKb(kb: number | null) {
   return `${kb} KB`;
 }
 
+function normalizeText(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/["']/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 // Pick a matching color and icon for each status
 function getStatusMeta(status: string) {
   const s = normalizeStatus(status);
@@ -81,6 +91,12 @@ export default function VerifyCaregiverScreen({ navigation, route }: Props) {
   }, [profileStatus, t]);
 
   const statusMeta = useMemo(() => getStatusMeta(profileStatus), [profileStatus]);
+
+  const getDocumentTypeLabel = (documentType: string) => {
+    const key = `document_type_${normalizeText(documentType)}`;
+    const translated = t(key);
+    return translated === key ? documentType || "-" : translated;
+  };
 
   const fetchDetails = async () => {
     try {
@@ -223,7 +239,7 @@ export default function VerifyCaregiverScreen({ navigation, route }: Props) {
             </View>
           ) : (
             // Render each uploaded document with file details and open action
-            docs.map((d) => {
+            docs.map((d, index) => {
               const docStatusLabel = (() => {
                 const s = normalizeStatus(d.verification_status);
                 if (s === "PENDING_VERIFICATION" || s === "PENDING") return t("pending_verification");
@@ -235,7 +251,13 @@ export default function VerifyCaregiverScreen({ navigation, route }: Props) {
               })();
 
               return (
-                <View key={d.document_id} style={styles.docRow}>
+                <View
+                  key={d.document_id}
+                  style={[
+                    styles.docRow,
+                    index === docs.length - 1 ? { borderBottomWidth: 0 } : null,
+                  ]}
+                >
                   <View style={styles.docIcon}>
                     <Ionicons name="document-text-outline" size={20} color="#2E6BFF" />
                   </View>
@@ -245,7 +267,7 @@ export default function VerifyCaregiverScreen({ navigation, route }: Props) {
                       {d.file_name}
                     </Text>
                     <Text style={styles.docMeta}>
-                      {String(d.document_type)} • {formatKb(d.file_size_kb)} •{" "}
+                      {getDocumentTypeLabel(String(d.document_type))} • {formatKb(d.file_size_kb)} •{" "}
                       {formatDate(d.uploaded_at)} • {docStatusLabel}
                     </Text>
                   </View>
@@ -270,10 +292,12 @@ export default function VerifyCaregiverScreen({ navigation, route }: Props) {
           {actionLoading === "REJECTED" ? (
             <ActivityIndicator color="#EF4444" />
           ) : (
-            <>
+            <View style={styles.btnInner}>
               <Ionicons name="close" size={18} color="#EF4444" />
-              <Text style={styles.rejectText}>{t("reject")}</Text>
-            </>
+              <Text style={styles.rejectText} numberOfLines={2}>
+                {t("reject")}
+              </Text>
+            </View>
           )}
         </Pressable>
 
@@ -286,10 +310,12 @@ export default function VerifyCaregiverScreen({ navigation, route }: Props) {
           {actionLoading === "VERIFIED" ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <>
+            <View style={styles.btnInner}>
               <Ionicons name="shield-checkmark" size={18} color="#fff" />
-              <Text style={styles.approveText}>{t("approve")}</Text>
-            </>
+              <Text style={styles.approveText} numberOfLines={2}>
+                {t("approve")}
+              </Text>
+            </View>
           )}
         </Pressable>
       </View>
@@ -443,35 +469,52 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.border,
     flexDirection: "row",
     gap: 12,
+    alignItems: "stretch",
+  },
+  btnInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    width: "100%",
+    minHeight: 24,
   },
   rejectBtn: {
     flex: 1,
-    height: 52,
+    minHeight: 56,
     borderRadius: 16,
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#FECACA",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   rejectText: { 
+    flexShrink: 1,
     fontWeight: "900", 
-    color: "#EF4444" 
+    color: "#EF4444",
+    textAlign: "center",
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   approveBtn: {
     flex: 1,
-    height: 52,
+    minHeight: 56,
     borderRadius: 16,
     backgroundColor: "#2E6BFF",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   approveText: { 
+    flexShrink: 1,
     fontWeight: "900", 
-    color: "#fff" 
+    color: "#fff",
+    textAlign: "center",
+    lineHeight: 20,
+    includeFontPadding: false,
   },
 });

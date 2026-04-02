@@ -15,18 +15,56 @@ function cleanText(v: any) {
   if (!s || s === "not_set" || s === "null" || s === "undefined") return "";
   return s;
 }
+
+function mapDisplayValueToTranslationKey(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  const map: Record<string, string> = {
+    "elderly care": "care_elderly",
+    "child care": "care_child",
+    "disability care": "care_disability",
+    "patient care": "care_patient",
+    "palliative care": "care_palliative",
+    "domestic support": "care_domestic",
+    "other": "other",
+
+    "cooking and looking after": "cook_and_care",
+    "looking after only": "care_only",
+    "supervising only": "supervise_only",
+    "all-around care": "all_around",
+
+    "half-day": "half_day",
+    "full-day": "full_day",
+    "hourly basis": "hourly",
+    "live-in caregiver": "live_in",
+
+    "sinhala": "lang_si",
+    "english": "lang_en",
+    "tamil": "lang_ta",
+  };
+
+  return map[normalized] || null;
+}
+
+function translateDisplayValue(value: string, t: (key: string, options?: any) => string) {
+  const key = mapDisplayValueToTranslationKey(value);
+  return key ? t(key) : value;
+}
+
 // Format a date safely for diaplay in request details
-function prettyDate(iso?: string, dashValue: string = "—") {
+function prettyDate(iso: string | undefined, language: string, dashValue: string = "—") {
   if (!iso) return dashValue;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return dashValue;
-  return d.toLocaleString();
+  return d.toLocaleString(language);
 }
 
 // Convert an array of care needs into a readable string for display
-function needsToText(needs?: string[] | null) {
+function needsToText(needs?: string[] | null, t?: any) {
   if (!needs || !Array.isArray(needs) || needs.length === 0) return "";
-  return needs.join(", ");
+  return needs
+    .map((item) => translateDisplayValue(String(item), t))
+    .join(", ");
 }
 // Normalize the time period so salary formatting is easier
 function normalizeTimePeriod(value: any) {
@@ -34,56 +72,80 @@ function normalizeTimePeriod(value: any) {
 }
 
 // Format the expected rate based on the selected work period
-function formatSalaryByPeriod(rate: any, timePeriod: any) {
+function formatSalaryByPeriod(rate: any, timePeriod: any, t: any) {
   const amount = Number(rate || 0);
   if (!Number.isFinite(amount) || amount <= 0) return "—";
 
   const p = normalizeTimePeriod(timePeriod);
 
-  if (p.includes("hour")) return `Rs. ${amount} / hour`;
-  if (p.includes("half")) return `Rs. ${amount} / half-day`;
-  if (p.includes("full")) return `Rs. ${amount} / day`;
-  if (p.includes("live")) return `Rs. ${amount} / month`;
+  if (p.includes("hour")) return `Rs. ${amount} / ${t("per_hour")}`;
+  if (p.includes("half")) return `Rs. ${amount} / ${t("half_day")}`;
+  if (p.includes("full")) return `Rs. ${amount} / ${t("full_day")}`;
+  if (p.includes("live")) return `Rs. ${amount} / ${t("live_in")}`;
 
   return `Rs. ${amount}`;
 }
 
 export default function RequestDetailsScreen({ navigation, route }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { booking } = route.params;
 
   const [saving, setSaving] = useState(false);
 
   const familyName = cleanText(booking.family_name) || t("family_generic");
-  const district = cleanText(booking.family_district);
 
-  const status = booking.booking_status || "Requested";
+  const rawDistrict = cleanText(booking.family_district);
+  const district = rawDistrict
+    ? t(`district_${rawDistrict.toLowerCase().replace(/\s+/g, "_")}`, {
+        defaultValue: rawDistrict,
+      })
+    : "";
 
-  const needsText = needsToText(booking.family_care_needs) || t("no_needs_provided");
-  const scheduleText = cleanText(booking.caregiver_time_period) || t("dash_value");
+  const rawStatus = booking.booking_status || "Requested";
+  const status =
+    rawStatus === "Accepted"
+      ? t("accepted")
+      : rawStatus === "Declined"
+      ? t("declined")
+      : rawStatus === "Completed"
+      ? t("status_completed")
+      : rawStatus === "Cancelled"
+      ? t("status_cancelled")
+      : t("status_requested");
+
+  const needsText = needsToText(booking.family_care_needs, t) || t("no_needs_provided");
+
+  const rawScheduleText = cleanText(booking.caregiver_time_period);
+  const scheduleText = rawScheduleText ? translateDisplayValue(rawScheduleText, t) : t("dash_value");
 
   const salaryText =
     booking.caregiver_expected_rate != null && String(booking.caregiver_expected_rate).trim() !== ""
-      ? formatSalaryByPeriod(booking.caregiver_expected_rate, booking.caregiver_time_period)
+      ? formatSalaryByPeriod(booking.caregiver_expected_rate, booking.caregiver_time_period, t)
       : t("dash_value");
 
 // Build a simple list of request requirements from booking details
-      const requirements = useMemo(() => {
+  const requirements = useMemo(() => {
     const req: string[] = [];
     req.push(t("requirement_background_check"));
 
     const langs = cleanText(booking.caregiver_languages);
-    if (langs) req.push(t("requirement_languages", { langs }));
+    if (langs) {
+      const translatedLangs = langs
+        .split(",")
+        .map((x: string) => translateDisplayValue(String(x).trim(), t))
+        .join(", ");
+      req.push(t("requirement_languages", { langs: translatedLangs }));
+    }
 
     const st = cleanText(booking.caregiver_service_type);
-    if (st) req.push(st);
+    if (st) req.push(translateDisplayValue(st, t));
 
     return req;
   }, [booking, t]);
 
   // Only requested booking can be accepted or declined 
-  const canAcceptDecline = status === "Requested";
-  const canComplete = status === "Accepted";
+  const canAcceptDecline = rawStatus === "Requested";
+  const canComplete = rawStatus === "Accepted";
 
   // Update the booking status
   const updateStatus = async (newStatus: "Accepted" | "Declined" | "Completed") => {
@@ -182,10 +244,10 @@ export default function RequestDetailsScreen({ navigation, route }: Props) {
               {t("status")}: {status}
             </Text>
             <Text style={styles.metaLine}>
-              {t("service_date")}: {prettyDate(booking.service_date, t("dash_value"))}
+              {t("service_date")}: {prettyDate(booking.service_date, i18n.language, t("dash_value"))}
             </Text>
             <Text style={styles.metaLine}>
-              {t("requested")}: {prettyDate(booking.requested_at, t("dash_value"))}
+              {t("requested")}: {prettyDate(booking.requested_at, i18n.language, t("dash_value"))}
             </Text>
           </View>
         </View>

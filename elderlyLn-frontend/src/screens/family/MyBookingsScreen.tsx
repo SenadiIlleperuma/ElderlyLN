@@ -32,18 +32,46 @@ type BookingRow = {
 type ComplaintCategory = "Punctuality" | "Safety Concern" | "Service Quality" | "Other";
 
 // Formats ISO date values into a readable date and time string for booking display
-function formatPrettyDate(iso: string) {
+function formatPrettyDate(iso: string, language: string) {
   const d = new Date(iso);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
+
+  if (Number.isNaN(d.getTime())) return iso;
+
+  const monthsEn = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthsSi = ["ජන", "පෙබ", "මාර්", "අප්‍රේ", "මැයි", "ජූනි", "ජූලි", "අගෝ", "සැප්", "ඔක්", "නොවැ", "දෙසැ"];
+  const monthsTa = ["ஜன", "பிப்", "மார்", "ஏப்", "மே", "ஜூன்", "ஜூலை", "ஆக்", "செப்", "அக்", "நவ", "டிச"];
+
+  const day = d.getDate();
+  const year = d.getFullYear();
 
   let hours = d.getHours();
   const minutes = String(d.getMinutes()).padStart(2, "0");
-  const ampm = hours >= 12 ? "PM" : "AM";
+  const isPm = hours >= 12;
   hours = hours % 12 || 12;
 
-  return `${yyyy}-${mm}-${dd} • ${hours}:${minutes} ${ampm}`;
+  const lang = String(language || "en").toLowerCase();
+  const isSinhala = lang.startsWith("si");
+  const isTamil = lang.startsWith("ta");
+
+  const monthName = isSinhala
+    ? monthsSi[d.getMonth()]
+    : isTamil
+    ? monthsTa[d.getMonth()]
+    : monthsEn[d.getMonth()];
+
+  const ampm = isSinhala
+    ? isPm
+      ? "ප.ව."
+      : "පෙ.ව."
+    : isTamil
+    ? isPm
+      ? "பி.ப."
+      : "மு.ப."
+    : isPm
+    ? "PM"
+    : "AM";
+
+  return `${day} ${monthName} ${year} • ${hours}:${minutes} ${ampm}`;
 }
 
 // Cleans nullable or placeholder values before rendering them in the UI
@@ -54,7 +82,7 @@ function clean(v: any) {
 }
 
 export default function MyBookingsScreen({ navigation }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
@@ -72,6 +100,37 @@ export default function MyBookingsScreen({ navigation }: Props) {
   const [stars, setStars] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  const translateDistrict = useCallback(
+    (value: any) => {
+      const raw = clean(value);
+      if (!raw) return "";
+      return t(`district_${raw.toLowerCase().replace(/\s+/g, "_")}`, {
+        defaultValue: raw,
+      });
+    },
+    [t]
+  );
+
+  const formatBookingDate = useCallback(
+    (iso: string) => formatPrettyDate(iso, i18n.language),
+    [i18n.language]
+  );
+
+  const getStatusLabel = useCallback(
+    (status: BookingRow["booking_status"]) => {
+      return status === "Requested"
+        ? t("status_requested")
+        : status === "Accepted"
+        ? t("accepted")
+        : status === "Completed"
+        ? t("status_completed")
+        : status === "Declined"
+        ? t("declined")
+        : t("status_cancelled");
+    },
+    [t]
+  );
 
   // Retrieves all bookings related to the logged-in family user
   const fetchBookings = useCallback(async () => {
@@ -120,16 +179,9 @@ export default function MyBookingsScreen({ navigation }: Props) {
       status === "Declined" ? "#B91C1C" :
       "#374151";
 
-    const label =
-      status === "Requested" ? t("status_requested") :
-      status === "Accepted" ? t("accepted") :
-      status === "Completed" ? t("status_completed") :
-      status === "Declined" ? t("declined") :
-      t("status_cancelled");
-
     return (
       <View style={[styles.badge, { backgroundColor: bg }]}>
-        <Text style={[styles.badgeText, { color: txt }]}>{label}</Text>
+        <Text style={[styles.badgeText, { color: txt }]}>{getStatusLabel(status)}</Text>
       </View>
     );
   };
@@ -316,7 +368,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
               const canCancel = b.booking_status === "Requested" || b.booking_status === "Accepted";
 
               const caregiverName = clean(b.caregiver_name) || t("caregiver_generic");
-              const caregiverDistrict = clean(b.caregiver_district);
+              const caregiverDistrict = translateDistrict(b.caregiver_district);
 
               // Prevents duplicate complaints for the same booking
               const complaintLocked = b.has_complaint === true;
@@ -333,7 +385,7 @@ export default function MyBookingsScreen({ navigation }: Props) {
                   <View style={styles.topRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.name}>{caregiverName}</Text>
-                      <Text style={styles.sub}>{formatPrettyDate(b.service_date)}</Text>
+                      <Text style={styles.sub}>{formatBookingDate(b.service_date)}</Text>
                       {!!caregiverDistrict && <Text style={styles.subSmall}>{caregiverDistrict}</Text>}
                     </View>
                     <StatusBadge status={b.booking_status} />
@@ -349,8 +401,8 @@ export default function MyBookingsScreen({ navigation }: Props) {
                   {open && (
                     <View style={styles.detailBox}>
                       <Text style={styles.dTitle}>{t("booking_details")}</Text>
-                      <Text style={styles.dText}>{t("status")}: {b.booking_status}</Text>
-                      <Text style={styles.dText}>{t("requested_at")}: {formatPrettyDate(b.requested_at)}</Text>
+                      <Text style={styles.dText}>{t("status")}: {getStatusLabel(b.booking_status)}</Text>
+                      <Text style={styles.dText}>{t("requested_at")}: {formatBookingDate(b.requested_at)}</Text>
 
                       <View style={{ height: 10 }} />
 

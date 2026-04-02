@@ -492,10 +492,119 @@ async function reactivateMyAccount(userId) {
 
 // Permanently deletes account.
 async function deleteMyAccountPermanently(userId) {
-  const q = `DELETE FROM "user" WHERE user_id = $1 RETURNING user_id`;
-  const r = await db.query(q, [userId]);
-  if (!r.rows[0]) throw new Error("Account not found.");
-  return { deleted: true };
+  try {
+    await db.query("BEGIN");
+
+    const familyRes = await db.query(
+      `SELECT family_id FROM family WHERE user_fk = $1 LIMIT 1`,
+      [userId]
+    );
+    const caregiverRes = await db.query(
+      `SELECT caregiver_id FROM caregiver WHERE user_fk = $1 LIMIT 1`,
+      [userId]
+    );
+
+    const familyId = familyRes.rows[0]?.family_id || null;
+    const caregiverId = caregiverRes.rows[0]?.caregiver_id || null;
+
+    // Delete complaint rows where this user filed the complaint
+    await db.query(
+      `DELETE FROM complaint WHERE filer_fk = $1`,
+      [userId]
+    );
+
+    // Clear complaint rows where this user is stored as resolver
+    await db.query(
+      `UPDATE complaint SET resolved_by_fk = NULL WHERE resolved_by_fk = $1`,
+      [userId]
+    );
+
+    if (caregiverId) {
+      await db.query(
+        `DELETE FROM caregiver_document WHERE caregiver_fk = $1`,
+        [caregiverId]
+      );
+    }
+
+    // Delete reviews connected to bookings owned by this user
+    await db.query(
+      `
+      DELETE FROM review
+      WHERE booking_fk IN (
+        SELECT booking_id FROM booking WHERE family_fk = (
+          SELECT family_id FROM family WHERE user_fk = $1
+        )
+      )
+      `,
+      [userId]
+    );
+
+    await db.query(
+      `
+      DELETE FROM review
+      WHERE booking_fk IN (
+        SELECT booking_id FROM booking WHERE caregiver_fk = (
+          SELECT caregiver_id FROM caregiver WHERE user_fk = $1
+        )
+      )
+      `,
+      [userId]
+    );
+
+    // Delete complaints connected to bookings owned by this user
+    await db.query(
+      `
+      DELETE FROM complaint
+      WHERE booking_fk IN (
+        SELECT booking_id FROM booking WHERE family_fk = (
+          SELECT family_id FROM family WHERE user_fk = $1
+        )
+      )
+      `,
+      [userId]
+    );
+
+    await db.query(
+      `
+      DELETE FROM complaint
+      WHERE booking_fk IN (
+        SELECT booking_id FROM booking WHERE caregiver_fk = (
+          SELECT caregiver_id FROM caregiver WHERE user_fk = $1
+        )
+      )
+      `,
+      [userId]
+    );
+
+    // Delete bookings owned by this user
+    if (familyId) {
+      await db.query(`DELETE FROM booking WHERE family_fk = $1`, [familyId]);
+    }
+
+    if (caregiverId) {
+      await db.query(`DELETE FROM booking WHERE caregiver_fk = $1`, [caregiverId]);
+    }
+
+    // Delete role profile rows
+    await db.query(`DELETE FROM family WHERE user_fk = $1`, [userId]);
+    await db.query(`DELETE FROM caregiver WHERE user_fk = $1`, [userId]);
+
+    // Finally delete user row
+    const r = await db.query(
+      `DELETE FROM "user" WHERE user_id = $1 RETURNING user_id`,
+      [userId]
+    );
+
+    if (!r.rows[0]) {
+      throw new Error("Account not found.");
+    }
+
+    await db.query("COMMIT");
+    return { deleted: true };
+  } catch (error) {
+    await db.query("ROLLBACK");
+    throw error;
+  }
 }
 
 module.exports = {

@@ -183,7 +183,7 @@ export default function AdminHomeScreen({ navigation }: any) {
           <Text style={styles.urgentText}>{t("urgent_issues_sub")}</Text>
           {/* // Quick shortcut to the admin hub for urgent unresolved issues */}
           <Pressable style={styles.urgentBtn} onPress={() => navigation?.navigate?.("AdminHub")}>
-            <Text style={styles.urgentBtnText}>{t("go_to_hub")}</Text>
+            <Text style={styles.urgentBtnText} numberOfLines={2}>{t("go_to_hub")}</Text>
           </Pressable>
 
           <Text style={styles.urgentSmall}>{t("unresolved_count", { count: urgentUnresolved })}</Text>
@@ -353,11 +353,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 16,
     paddingVertical: 12,
+    paddingHorizontal: 12,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: "#FFE4E6",
+    minHeight: 52,
   },
-  urgentBtnText: { fontWeight: "900", color: "#be123c" },
+  urgentBtnText: {
+    fontWeight: "900",
+    color: "#be123c",
+    textAlign: "center",
+    width: "100%",
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
   urgentSmall: {
     marginTop: 10,
     fontWeight: "800",
