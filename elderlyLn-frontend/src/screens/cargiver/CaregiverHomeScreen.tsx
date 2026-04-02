@@ -62,21 +62,92 @@ function hasExplicitTime(value: string) {
   return /T\d{2}:\d{2}/.test(String(value ?? "")) || /\d{2}:\d{2}/.test(String(value ?? ""));
 }
 
+function mapDisplayValueToTranslationKey(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  const map: Record<string, string> = {
+    "elderly care": "care_elderly",
+    "child care": "care_child",
+    "disability care": "care_disability",
+    "patient care": "care_patient",
+    "palliative care": "care_palliative",
+    "domestic support": "care_domestic",
+    "other": "other",
+
+    "cooking and looking after": "cook_and_care",
+    "looking after only": "care_only",
+    "supervising only": "supervise_only",
+    "all-around care": "all_around",
+
+    "half-day": "half_day",
+    "full-day": "full_day",
+    "hourly basis": "hourly",
+    "live-in caregiver": "live_in",
+
+    "sinhala": "lang_si",
+    "english": "lang_en",
+    "tamil": "lang_ta",
+  };
+
+  return map[normalized] || null;
+}
+
+function translateDisplayValue(value: string, t: (key: string, options?: any) => string) {
+  const key = mapDisplayValueToTranslationKey(value);
+  return key ? t(key) : value;
+}
+
 // Format service date into a month and day display
-function formatShiftDate(iso: string) {
+function formatShiftDate(iso: string, language: string) {
   const d = parseServiceDate(iso);
   if (!d) return { month: "—", day: "—" };
-  const month = d.toLocaleString("en-US", { month: "short" }).toUpperCase();
+
+  const monthsEn = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const monthsSi = ["ජන", "පෙබ", "මාර්", "අප්", "මැයි", "ජූනි", "ජූලි", "අගෝ", "සැප්", "ඔක්", "නොවැ", "දෙසැ"];
+  const monthsTa = ["ஜன", "பிப்", "மார்", "ஏப்", "மே", "ஜூன்", "ஜூலை", "ஆக்", "செப்", "அக்", "நவ", "டிச"];
+
+  const lang = String(language || "en").toLowerCase();
+  const isSinhala = lang.startsWith("si");
+  const isTamil = lang.startsWith("ta");
+
+  const month = isSinhala
+    ? monthsSi[d.getMonth()]
+    : isTamil
+    ? monthsTa[d.getMonth()]
+    : monthsEn[d.getMonth()];
+
   const day = String(d.getDate());
   return { month, day };
 }
 
 // Format service date into a time display
-function formatShiftTime(iso: string) {
+function formatShiftTime(iso: string, language: string) {
   const d = parseServiceDate(iso);
   if (!d) return "—";
   if (!hasExplicitTime(iso)) return "—";
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  const lang = String(language || "en").toLowerCase();
+  const isSinhala = lang.startsWith("si");
+  const isTamil = lang.startsWith("ta");
+
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const isPm = hours >= 12;
+  hours = hours % 12 || 12;
+
+  const ampm = isSinhala
+    ? isPm
+      ? "ප.ව."
+      : "පෙ.ව."
+    : isTamil
+    ? isPm
+      ? "பி.ப."
+      : "மு.ப."
+    : isPm
+    ? "PM"
+    : "AM";
+
+  return `${hours}:${minutes} ${ampm}`;
 }
 
 // Normalize booking status for consistent comparisons
@@ -119,6 +190,26 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
     })();
   }, []);
 
+  const translateDistrict = useCallback(
+    (value: any) => {
+      const raw = cleanText(value);
+      if (!raw) return "";
+      return t(`district_${raw.toLowerCase().replace(/\s+/g, "_")}`, {
+        defaultValue: raw,
+      });
+    },
+    [t]
+  );
+
+  const translateTimePeriod = useCallback(
+    (value: any) => {
+      const raw = cleanText(value);
+      if (!raw) return "";
+      return translateDisplayValue(raw, t);
+    },
+    [t]
+  );
+
   // Load all bookings linked to the caregiver
   const loadBookings = useCallback(async () => {
     try {
@@ -153,7 +244,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
     }
   }, []);
 
-// Load bookings when the screen is focused
+  // Load bookings when the screen is focused
   useFocusEffect(
     useCallback(() => {
       loadBookings();
@@ -230,11 +321,11 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
       .slice(0, 3);
 
     const shifts: Shift[] = upcomingAccepted.map((b) => {
-      const { month, day } = formatShiftDate(b.service_date);
-      const district = cleanText(b.family_district);
+      const { month, day } = formatShiftDate(b.service_date, i18n.language);
+      const district = translateDistrict(b.family_district);
       const family = cleanText(b.family_name) || t("family_generic");
       const title = district ? `${family} • ${district}` : family;
-      const start = cleanText(b.caregiver_time_period) || formatShiftTime(b.service_date);
+      const start = translateTimePeriod(b.caregiver_time_period) || formatShiftTime(b.service_date, i18n.language);
       return { id: b.booking_id, month, day, title, time: start !== "—" ? start : "—" };
     });
 
@@ -245,7 +336,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
       monthEarnings: monthEarn,
       upcomingShifts: shifts,
     };
-  }, [bookings, t]);
+  }, [bookings, t, i18n.language, translateDistrict, translateTimePeriod]);
 
   return (
     <SafeAreaView style={styles.safe}>

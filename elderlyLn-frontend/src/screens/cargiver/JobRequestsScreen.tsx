@@ -30,6 +30,41 @@ function isTomorrow(d: Date) {
   return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
 }
 
+function mapDisplayValueToTranslationKey(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  const map: Record<string, string> = {
+    "elderly care": "care_elderly",
+    "child care": "care_child",
+    "disability care": "care_disability",
+    "patient care": "care_patient",
+    "palliative care": "care_palliative",
+    "domestic support": "care_domestic",
+    "other": "other",
+
+    "cooking and looking after": "cook_and_care",
+    "looking after only": "care_only",
+    "supervising only": "supervise_only",
+    "all-around care": "all_around",
+
+    "half-day": "half_day",
+    "full-day": "full_day",
+    "hourly basis": "hourly",
+    "live-in caregiver": "live_in",
+
+    "sinhala": "lang_si",
+    "english": "lang_en",
+    "tamil": "lang_ta",
+  };
+
+  return map[normalized] || null;
+}
+
+function translateDisplayValue(value: string, t: (key: string, options?: any) => string) {
+  const key = mapDisplayValueToTranslationKey(value);
+  return key ? t(key) : value;
+}
+
 // Create a stable demo match percentage from the booking id
 function stableMatchPercent(id: string) {
   let h = 0;
@@ -38,7 +73,7 @@ function stableMatchPercent(id: string) {
 }
 
 export default function JobRequestsScreen({ navigation }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,7 +85,21 @@ export default function JobRequestsScreen({ navigation }: Props) {
     if (Number.isNaN(d.getTime())) return t("dash_value");
     if (isToday(d)) return t("today");
     if (isTomorrow(d)) return t("tomorrow");
-    return d.toLocaleDateString();
+    return d.toLocaleDateString(i18n.language);
+  };
+
+  const translateDistrict = (value: any) => {
+    const raw = cleanText(value);
+    if (!raw) return "";
+    return t(`district_${raw.toLowerCase().replace(/\s+/g, "_")}`, {
+      defaultValue: raw,
+    });
+  };
+
+  const translateServiceType = (value: any) => {
+    const raw = cleanText(value);
+    if (!raw) return t("job_full_time_tag");
+    return translateDisplayValue(raw, t);
   };
 
   // Load caregiver booking requests from the backend
@@ -116,8 +165,8 @@ export default function JobRequestsScreen({ navigation }: Props) {
   // Render a single booking request card in the list
   const renderItem = ({ item }: { item: BookingRow }) => {
     const name = cleanText(item.family_name) || t("family_generic");
-    const district = cleanText(item.family_district);
-    const serviceType = cleanText(item.caregiver_service_type);
+    const district = translateDistrict(item.family_district);
+    const serviceType = translateServiceType(item.caregiver_service_type);
     const label = dateLabel(item.service_date);
     // Show a consistent demo match score for the request card
     const match = stableMatchPercent(item.booking_id);
