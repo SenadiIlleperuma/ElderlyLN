@@ -31,20 +31,74 @@ const LANGUAGES = [
   { code: "si", label: "සිංහල", short: "SI" },
   { code: "ta", label: "தமிழ்", short: "TA" },
 ];
+
 // Format booking dates for the recent bookings section
-function formatShortDate(iso: string) {
+function formatShortDate(iso: string, language: string) {
   const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  if (Number.isNaN(d.getTime())) return iso;
+
+  const monthsEn = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthsSi = ["ජන", "පෙබ", "මාර්", "අප්‍රේ", "මැයි", "ජූනි", "ජූලි", "අගෝ", "සැප්", "ඔක්", "නොවැ", "දෙසැ"];
+  const monthsTa = ["ஜன", "பிப்", "மார்", "ஏப்", "மே", "ஜூன்", "ஜூலை", "ஆக்", "செப்", "அக்", "நவ", "டிச"];
+
+  const day = d.getDate();
+  const year = d.getFullYear();
+
+  const lang = String(language || "en").toLowerCase();
+  const isSinhala = lang.startsWith("si");
+  const isTamil = lang.startsWith("ta");
+
+  const monthName = isSinhala
+    ? monthsSi[d.getMonth()]
+    : isTamil
+    ? monthsTa[d.getMonth()]
+    : monthsEn[d.getMonth()];
+
+  return `${day} ${monthName} ${year}`;
 }
+
 // Clean and normalize booking data for display
 function clean(v: any) {
   const s = String(v ?? "").trim();
   if (!s || s === "not_set" || s === "null" || s === "undefined") return "";
   return s;
 }
+
+function mapDisplayValueToTranslationKey(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  const map: Record<string, string> = {
+    "elderly care": "care_elderly",
+    "child care": "care_child",
+    "disability care": "care_disability",
+    "patient care": "care_patient",
+    "palliative care": "care_palliative",
+    "domestic support": "care_domestic",
+    "other": "other",
+
+    "cooking and looking after": "cook_and_care",
+    "looking after only": "care_only",
+    "supervising only": "supervise_only",
+    "all-around care": "all_around",
+
+    "half-day": "half_day",
+    "full-day": "full_day",
+    "hourly basis": "hourly",
+    "live-in caregiver": "live_in",
+
+    "sinhala": "lang_si",
+    "english": "lang_en",
+    "tamil": "lang_ta",
+  };
+
+  return map[normalized] || null;
+}
+
+function translateDisplayValue(value: string, t: (key: string, options?: any) => string) {
+  const key = mapDisplayValueToTranslationKey(value);
+  return key ? t(key) : value;
+}
+
 // Convert backend booking status into simplified UI status
 function toUiStatus(s: BookingRow["booking_status"]): BookingStatusUI {
   if (s === "Completed") return "COMPLETED";
@@ -86,7 +140,28 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       setFullName("");
     }
   };
-// Load a small set of recent bookings for the home screen
+
+  const translateDistrict = useCallback(
+    (value: any) => {
+      const raw = clean(value);
+      if (!raw) return "";
+      return t(`district_${raw.toLowerCase().replace(/\s+/g, "_")}`, {
+        defaultValue: raw,
+      });
+    },
+    [t]
+  );
+
+  const translateServiceType = useCallback(
+    (value: any) => {
+      const raw = clean(value);
+      if (!raw) return t("service_type");
+      return translateDisplayValue(raw, t);
+    },
+    [t]
+  );
+
+ // Load a small set of recent bookings for the home screen
   const fetchRecentBookings = async () => {
     try {
       setLoadingRecent(true);
@@ -101,14 +176,16 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       setLoadingRecent(false);
     }
   };
-// Refresh the greeting and recent bookings when the screen is focused
+
+ // Refresh the greeting and recent bookings when the screen is focused
   useFocusEffect(
     useCallback(() => {
       loadUserName();
       fetchRecentBookings();
     }, [])
   );
-// Refresh handler for pull-to-refresh, reloads the user's name and recent bookings
+
+ // Refresh handler for pull-to-refresh, reloads the user's name and recent bookings
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadUserName();
@@ -126,7 +203,8 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       console.log("Language change error:", error);
     }
   };
-//  Return the translated label for each simplified booking status
+
+ //  Return the translated label for each simplified booking status
   const statusLabel = (s: BookingStatusUI) => {
     if (s === "UPCOMING") return t("status_upcoming");
     if (s === "COMPLETED") return t("status_completed");
@@ -143,7 +221,8 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       </View>
     );
   };
-// Handle user logout
+
+ // Handle user logout
   const onLogout = async () => {
     await AsyncStorage.multiRemove(["token", "user", "role", "session"]);
     navigation.reset({ index: 0, routes: [{ name: "RoleSelect" }] });
@@ -219,6 +298,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
             <Ionicons name="person-outline" size={22} color={theme.colors.primary} />
           </Pressable>
         </View>
+
           {/* Search for caregivers */}
         <View style={styles.bigCard}>
           <Text style={styles.bigTitle}>{t("find_support")}</Text>
@@ -258,8 +338,9 @@ export default function FamilyHomeScreen({ navigation }: Props) {
           recent.map((b) => {
             const uiStatus = toUiStatus(b.booking_status);
             const caregiverName = clean(b.caregiver_name) || t("caregiver_generic");
-            const date = formatShortDate(b.service_date);
-            const service = clean(b.caregiver_service_type) || t("service_type");
+            const date = formatShortDate(b.service_date, i18n.language);
+            const service = translateServiceType(b.caregiver_service_type);
+            const district = translateDistrict(b.caregiver_district);
 
             return (
               <Pressable
@@ -273,6 +354,7 @@ export default function FamilyHomeScreen({ navigation }: Props) {
                   <Text style={styles.bookingMeta}>
                     {date} • {service}
                   </Text>
+                  {!!district && <Text style={styles.bookingMeta}>{district}</Text>}
                 </View>
                 <Badge status={uiStatus} />
               </Pressable>

@@ -1,13 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  Image,
-  ActivityIndicator,
-} from "react-native";
+import {View,Text,StyleSheet,Pressable,ScrollView,Image, ActivityIndicator,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -31,6 +23,56 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function mapDisplayValueToTranslationKey(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  const map: Record<string, string> = {
+    "elderly care": "care_elderly",
+    "child care": "care_child",
+    "disability care": "care_disability",
+    "patient care": "care_patient",
+    "palliative care": "care_palliative",
+    "domestic support": "care_domestic",
+    "other": "other",
+
+    "cooking and looking after": "cook_and_care",
+    "looking after only": "care_only",
+    "supervising only": "supervise_only",
+    "all-around care": "all_around",
+
+    "half-day": "half_day",
+    "full-day": "full_day",
+    "hourly basis": "hourly",
+    "live-in caregiver": "live_in",
+
+    "sinhala": "lang_si",
+    "tamil": "lang_ta",
+    "english": "lang_en",
+  };
+
+  return map[normalized] || null;
+}
+
+function translateDisplayValue(value: string, t: (key: string) => string) {
+  const key = mapDisplayValueToTranslationKey(value);
+  return key ? t(key) : value;
+}
+
+function translateDisplayList(values: string[], t: (key: string) => string) {
+  return values.map((value) => translateDisplayValue(String(value).trim(), t));
+}
+
+function getNumericValue(...values: any[]) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
 export default function TopMatchesScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   const { matches = [], filters } = route.params || ({} as any);
@@ -44,7 +86,9 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
   const displayDistrict =
     district === "" || district === "anywhere"
       ? t("sri_lanka")
-      : district.charAt(0).toUpperCase() + district.slice(1);
+      : t(`district_${String(district).trim().toLowerCase().replace(/\s+/g, "_")}`, {
+          defaultValue: district.charAt(0).toUpperCase() + district.slice(1),
+        });
 
     // Attempts to fetch the full caregiver profile before opening the profile screen
   const openCaregiverProfile = async (c: any) => {
@@ -63,8 +107,41 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
       // Requests the full caregiver profile for detailed viewing
       const res = await api.get(`/profile/caregiver/${caregiverId}`);
 
+      const fallbackRating = getNumericValue(
+        c?.rating,
+        c?.avg_rating,
+        c?.average_rating,
+        c?.avgRating
+      );
+      const fetchedRating = getNumericValue(
+        res?.data?.rating,
+        res?.data?.avg_rating,
+        res?.data?.average_rating,
+        res?.data?.avgRating
+      );
+
+      const fallbackReviews = getNumericValue(
+        c?.reviewsCount,
+        c?.reviews_count,
+        c?.review_count,
+        c?.reviewCount
+      );
+      const fetchedReviews = getNumericValue(
+        res?.data?.reviewsCount,
+        res?.data?.reviews_count,
+        res?.data?.review_count,
+        res?.data?.reviewCount
+      );
+
+      const mergedCaregiver = {
+        ...c,
+        ...res.data,
+        avg_rating: fetchedRating ?? fallbackRating ?? 0,
+        reviews_count: fetchedReviews ?? fallbackReviews ?? 0,
+      };
+
       navigation.navigate("CaregiverProfile", {
-        caregiver: res.data,
+        caregiver: mergedCaregiver,
         filters,
       });
     } catch (err: any) {
@@ -116,20 +193,20 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
           matches.map((c: any) => {
             // Normalise rating values from possible backend field names
             const ratingSafe =
-              typeof c.rating === "number"
-                ? c.rating
-                : typeof c.avg_rating === "number"
-                ? Number(c.avg_rating)
-                : typeof c.avg_rating === "string"
-                ? Number(c.avg_rating) || 0
-                : 0;
+              getNumericValue(
+                c?.rating,
+                c?.avg_rating,
+                c?.average_rating,
+                c?.avgRating
+              ) ?? 0;
             // Normalise review count values from possible backend field names  
             const reviewsSafe =
-              typeof c.reviewsCount === "number"
-                ? c.reviewsCount
-                : typeof c.reviews_count === "number"
-                ? c.reviews_count
-                : 0;
+              getNumericValue(
+                c?.reviewsCount,
+                c?.reviews_count,
+                c?.review_count,
+                c?.reviewCount
+              ) ?? 0;
 
             const expSafe =
               typeof c.experienceYears === "number"
@@ -147,8 +224,9 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
               : Array.isArray(c.care_category)
               ? c.care_category
               : [];
+            const translatedSpecialties = translateDisplayList(specialtiesArr, t);
             // Use the first specialty
-            const firstLine = specialtiesArr?.[0] || t("caregiver_generic");
+            const firstLine = translatedSpecialties?.[0] || t("caregiver_generic");
             const displayName = c?.name ?? c?.full_name ?? t("caregiver_generic");
             const initials = getInitials(displayName);
 
@@ -200,7 +278,7 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
                     </Text>
 
                     <View style={styles.tags}>
-                      {specialtiesArr.slice(0, 2).map((tag) => (
+                      {translatedSpecialties.slice(0, 2).map((tag) => (
                         <View key={tag} style={styles.tag}>
                           <Text style={styles.tagText}>{tag}</Text>
                         </View>

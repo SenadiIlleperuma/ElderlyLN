@@ -29,6 +29,16 @@ export default function EditProfileScreen({ navigation }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const translateDistrict = (value: string) => {
+    const raw = String(value || "").trim();
+    if (!raw) return raw;
+
+    return t(`district_${raw.toLowerCase().replace(/\s+/g, "_")}`, {
+      defaultValue: raw,
+    });
+  };
+
  // Load the user's profile information
   const loadProfile = async () => {
     try {
@@ -119,7 +129,7 @@ export default function EditProfileScreen({ navigation }: Props) {
           onPress: async () => {
             try {
               // API call to deactivate the account
-              await api.put("/profile/deactivate");
+              await api.put("/profile/account/deactivate");
               await AsyncStorage.removeItem("token");
 
               Alert.alert(t("done_title"), t("account_deactivated_msg"));
@@ -146,7 +156,7 @@ export default function EditProfileScreen({ navigation }: Props) {
         onPress: async () => {
           try {
             // API call to delete the account permanently
-            await api.delete("/profile/delete");
+            await api.delete("/profile/account/delete");
             await AsyncStorage.removeItem("token");
 
             Alert.alert(t("deleted_title"), t("account_deleted_msg"));
@@ -194,7 +204,7 @@ export default function EditProfileScreen({ navigation }: Props) {
           <View style={styles.topCard}>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{fullName || "—"}</Text>
-              <Text style={styles.sub}>{district || "—"}</Text>
+              <Text style={styles.sub}>{translateDistrict(district) || "—"}</Text>
             </View>
 
             <View style={styles.verifiedPill}>
@@ -225,7 +235,7 @@ export default function EditProfileScreen({ navigation }: Props) {
 
             <Text style={styles.label}>{t("district")}</Text>
             <TextInput
-              value={district}
+              value={isEditing ? district : translateDistrict(district)}
               onChangeText={setDistrict}
               editable={isEditing}
               style={[styles.input, !isEditing && styles.inputDisabled]}

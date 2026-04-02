@@ -25,6 +25,7 @@ const displayField = (v: any) => {
 
   return s;
 };
+
 // Convert various list formats into a clean string array
 const parseList = (raw: any): string[] => {
   if (!raw) return [];
@@ -36,6 +37,93 @@ const parseList = (raw: any): string[] => {
   return s.split(",").map((x) => x.trim()).filter(Boolean);
 };
 
+function mapDisplayValueToTranslationKey(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  const map: Record<string, string> = {
+    "elderly care": "care_elderly",
+    "child care": "care_child",
+    "disability care": "care_disability",
+    "patient care": "care_patient",
+    "palliative care": "care_palliative",
+    "domestic support": "care_domestic",
+    "other": "other",
+
+    "cooking and looking after": "cook_and_care",
+    "looking after only": "care_only",
+    "supervising only": "supervise_only",
+    "all-around care": "all_around",
+
+    "half-day": "half_day",
+    "full-day": "full_day",
+    "hourly basis": "hourly",
+    "live-in caregiver": "live_in",
+
+    "sinhala": "lang_si",
+    "english": "lang_en",
+    "tamil": "lang_ta",
+
+    "experienced caregiver": "experienced_caregiver",
+
+    "nvq level 2": "qual_nvq_level_2",
+    "nvq level 3": "qual_nvq_level_3",
+    "nvq level 4": "qual_nvq_level_4",
+    "first aid certificate": "qual_first_aid_certificate",
+    "diploma in caregiving": "qual_diploma_in_caregiving",
+    "short caregiving course": "qual_short_caregiving_course",
+    "phlebotomy+mental health": "qual_phlebotomy_mental_health",
+    "phlebotomy + mental health": "qual_phlebotomy_mental_health",
+  };
+
+  return map[normalized] || null;
+}
+
+function translateDisplayValue(value: string, t: (key: string, options?: any) => string) {
+  const key = mapDisplayValueToTranslationKey(value);
+  return key ? t(key) : value;
+}
+
+function translateDisplayList(values: string[], t: (key: string, options?: any) => string) {
+  return values.map((value) => translateDisplayValue(String(value).trim(), t));
+}
+
+function translateDisplayField(value: any, t: (key: string, options?: any) => string) {
+  if (value === null || value === undefined) return "-";
+
+  if (Array.isArray(value)) {
+    const translated = translateDisplayList(
+      value.map((item) => String(item).trim()).filter(Boolean),
+      t
+    );
+    return translated.length ? translated.join(", ") : "-";
+  }
+
+  const raw = displayField(value);
+  if (raw === "-") return raw;
+
+  const parts = raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length > 1) {
+    return translateDisplayList(parts, t).join(", ");
+  }
+
+  return translateDisplayValue(raw, t);
+}
+
+function getNumericValue(...values: any[]) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
 // Normalize status values to a consistent format for badge display
 function normalizeStatus(value: any) {
   return String(value || "")
@@ -43,6 +131,7 @@ function normalizeStatus(value: any) {
     .toUpperCase()
     .replace(/\s+/g, "_");
 }
+
 // Generate initials for avatar display based on the caregiver's name
 function getInitials(name: string) {
   return name
@@ -58,24 +147,28 @@ function getInitials(name: string) {
 export default function CaregiverProfileScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   const { caregiver } = route.params;
-// Determine display name with fallbacks and generate initials for avatar
+
+  // Determine display name with fallbacks and generate initials for avatar
   const displayName = displayField(caregiver?.name ?? caregiver?.full_name);
   const initials = getInitials(displayName === "-" ? t("caregiver_generic") : displayName);
 
   // Read rating from available fields
   const ratingSafe =
-    typeof caregiver?.rating === "number"
-      ? caregiver.rating
-      : typeof caregiver?.avg_rating === "number"
-      ? caregiver.avg_rating
-      : 0;
+    getNumericValue(
+      caregiver?.rating,
+      caregiver?.avg_rating,
+      caregiver?.average_rating,
+      caregiver?.avgRating
+    ) ?? 0;
+
   // Read reviews count from available fields
   const reviewsSafe =
-    typeof caregiver?.reviewsCount === "number"
-      ? caregiver.reviewsCount
-      : typeof caregiver?.reviews_count === "number"
-      ? caregiver.reviews_count
-      : 0;
+    getNumericValue(
+      caregiver?.reviewsCount,
+      caregiver?.reviews_count,
+      caregiver?.review_count,
+      caregiver?.reviewCount
+    ) ?? 0;
 
   // Read experience years from available fields
   const expSafe =
@@ -150,7 +243,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
     return parseList(raw);
   }, [caregiver]);
 
-// Build the caregiver verification badge list
+  // Build the caregiver verification badge list
   const badgesArr: string[] = useMemo(() => {
     const raw =
       caregiver?.verification_badges ??
@@ -164,6 +257,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
   const profileStatus = normalizeStatus(
     caregiver?.profile_status ?? caregiver?.status ?? caregiver?.verification_status
   );
+
   // Determine the text for the verification badge
   const badgeText =
     badgesArr.length > 0
@@ -171,12 +265,29 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
       : profileStatus === "VERIFIED"
       ? t("verified")
       : "";
+
   // Build the about text from available fields
   const aboutText =
     displayField(
       caregiver?.about ??
         (specialtiesArr.length ? specialtiesArr.join(", ") : t("experienced_caregiver"))
     ) || t("experienced_caregiver");
+
+  const translatedDistrict = (() => {
+    const rawDistrict = displayField(caregiver?.district);
+    if (rawDistrict === "-") return rawDistrict;
+
+    return t(`district_${rawDistrict.trim().toLowerCase().replace(/\s+/g, "_")}`, {
+      defaultValue: rawDistrict,
+    });
+  })();
+
+  const translatedServiceType = translateDisplayField(serviceTypeRaw, t);
+  const translatedTimePeriod = translateDisplayField(timePeriodRaw, t);
+  const translatedLanguages = translateDisplayField(languagesRaw, t);
+  const translatedAboutText = translateDisplayField(aboutText, t);
+  const translatedSpecialtiesArr = translateDisplayList(specialtiesArr, t);
+  const translatedQualsArr = translateDisplayList(qualsArr, t);
 
   // Open booking screen with the selected caregiver's details
   const onBookNow = () => {
@@ -216,7 +327,7 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
             ) : null}
 
             <Text style={styles.sub}>
-              {displayField(caregiver?.district)} • {expSafe} {t("yrs_exp")}
+              {translatedDistrict} • {expSafe} {t("yrs_exp")}
             </Text>
 
             <View style={styles.metricsRow}>
@@ -244,29 +355,29 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
             <View style={styles.infoGrid}>
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>{t("service_type")}</Text>
-                <Text style={styles.infoValue}>{displayField(serviceTypeRaw)}</Text>
+                <Text style={styles.infoValue}>{translatedServiceType}</Text>
               </View>
 
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>{t("time_period")}</Text>
-                <Text style={styles.infoValue}>{displayField(timePeriodRaw)}</Text>
+                <Text style={styles.infoValue}>{translatedTimePeriod}</Text>
               </View>
 
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>{t("languages")}</Text>
-                <Text style={styles.infoValue}>{displayField(languagesRaw)}</Text>
+                <Text style={styles.infoValue}>{translatedLanguages}</Text>
               </View>
             </View>
 
             <Text style={styles.sectionTitle}>{t("about")}</Text>
-            <Text style={styles.bodyText}>{aboutText}</Text>
+            <Text style={styles.bodyText}>{translatedAboutText}</Text>
 
             <Text style={styles.sectionTitle}>{t("specialties")}</Text>
             <View style={styles.chipsRow}>
-              {specialtiesArr.length === 0 ? (
+              {translatedSpecialtiesArr.length === 0 ? (
                 <Text style={styles.bodyText}>-</Text>
               ) : (
-                specialtiesArr.map((s) => (
+                translatedSpecialtiesArr.map((s) => (
                   <View key={s} style={styles.chip}>
                     <Text style={styles.chipText}>{s}</Text>
                   </View>
@@ -276,10 +387,10 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
 
             <Text style={styles.sectionTitle}>{t("qualifications")}</Text>
             <View style={{ marginTop: 10 }}>
-              {qualsArr.length === 0 ? (
+              {translatedQualsArr.length === 0 ? (
                 <Text style={styles.bodyText}>-</Text>
               ) : (
-                qualsArr.map((q) => (
+                translatedQualsArr.map((q) => (
                   <View key={q} style={styles.qualRow}>
                     <View style={styles.checkIcon}>
                       <Ionicons name="checkmark" size={16} color={theme.colors.primary} />
@@ -306,9 +417,9 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { 
-    flex: 1, 
-    backgroundColor: theme.colors.bg 
+  safe: {
+    flex: 1,
+    backgroundColor: theme.colors.bg,
   },
 
   header: {
@@ -319,12 +430,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  headerBtn: { 
-    width: 40, 
-    height: 40, 
-    alignItems: "center", 
-    justifyContent: "center"
-   },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: {
     flex: 1,
     textAlign: "center",
@@ -332,8 +443,8 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.colors.text,
   },
-  content: { 
-    padding: theme.spacing.xl 
+  content: {
+    padding: theme.spacing.xl,
   },
   hero: {
     backgroundColor: "white",
@@ -342,12 +453,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     overflow: "hidden",
   },
-  heroTop: { 
-    height: 120, 
-    backgroundColor: theme.colors.primary
-   },
-  heroBody: { 
-    padding: theme.spacing.xl 
+  heroTop: {
+    height: 120,
+    backgroundColor: theme.colors.primary,
+  },
+  heroBody: {
+    padding: theme.spacing.xl,
   },
   avatarWrap: {
     width: 92,
@@ -366,11 +477,11 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.colors.primary,
   },
-  name: { 
-    marginTop: 12, 
-    fontSize: 26, 
-    fontWeight: "900", 
-    color: theme.colors.text 
+  name: {
+    marginTop: 12,
+    fontSize: 26,
+    fontWeight: "900",
+    color: theme.colors.text,
   },
   badgeWrap: {
     marginTop: 10,
@@ -390,11 +501,11 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: 12,
   },
-  sub: { 
-    marginTop: 8, 
-    fontSize: 14, 
-    color: theme.colors.muted, 
-    fontWeight: "700" 
+  sub: {
+    marginTop: 8,
+    fontSize: 14,
+    color: theme.colors.muted,
+    fontWeight: "700",
   },
 
   metricsRow: {
@@ -406,19 +517,19 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     paddingVertical: 14,
   },
-  metric: { 
-    alignItems: "flex-start", 
-    gap: 4 
+  metric: {
+    alignItems: "flex-start",
+    gap: 4,
   },
-  metricLabel: { 
-    fontSize: 12, 
-    color: theme.colors.muted, 
-    fontWeight: "900" 
+  metricLabel: {
+    fontSize: 12,
+    color: theme.colors.muted,
+    fontWeight: "900",
   },
-  metricValue: { 
-    fontSize: 16, 
-    color: theme.colors.text, 
-    fontWeight: "900" 
+  metricValue: {
+    fontSize: 16,
+    color: theme.colors.text,
+    fontWeight: "900",
   },
 
   infoGrid: {
@@ -430,25 +541,25 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: 12,
   },
-  infoItem: { 
-    gap: 3 
+  infoItem: {
+    gap: 3,
   },
-  infoLabel: { 
-    fontSize: 12, 
-    color: theme.colors.muted, 
-    fontWeight: "900" 
+  infoLabel: {
+    fontSize: 12,
+    color: theme.colors.muted,
+    fontWeight: "900",
   },
-  infoValue: { 
-    fontSize: 14, 
-    color: theme.colors.text, 
-    fontWeight: "800" 
+  infoValue: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: "800",
   },
 
-  sectionTitle: { 
-    marginTop: 18, 
-    fontSize: 14, 
-    fontWeight: "900", 
-    color: theme.colors.text 
+  sectionTitle: {
+    marginTop: 18,
+    fontSize: 14,
+    fontWeight: "900",
+    color: theme.colors.text,
   },
   bodyText: {
     marginTop: 8,
@@ -457,12 +568,12 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
     fontWeight: "700",
   },
-  chipsRow: { 
-    flexDirection: "row", 
+  chipsRow: {
+    flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10, 
-    marginTop: 10 
-    },
+    gap: 10,
+    marginTop: 10,
+  },
   chip: {
     backgroundColor: "#EFF6FF",
     borderWidth: 1,
@@ -471,10 +582,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
   },
-  chipText: { 
-    color: theme.colors.primary, 
-    fontWeight: "900", 
-    fontSize: 13 
+  chipText: {
+    color: theme.colors.primary,
+    fontWeight: "900",
+    fontSize: 13,
   },
 
   qualRow: {
@@ -498,11 +609,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  qualText: { 
-    flex: 1, 
-    fontSize: 15, 
-    fontWeight: "800", 
-    color: theme.colors.text 
+  qualText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "800",
+    color: theme.colors.text,
   },
   bottomBar: {
     position: "absolute",
@@ -523,9 +634,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  bookBtnText: { 
-    color: "white", 
-    fontSize: 16, 
-    fontWeight: "900"
-   },
+  bookBtnText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "900",
+  },
 });
