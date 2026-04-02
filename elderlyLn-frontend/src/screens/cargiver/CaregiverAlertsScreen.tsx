@@ -29,20 +29,129 @@ type AlertItem = {
   relatedEntityId?: string | null;
 };
 
+function parseNotificationDate(dateString: string) {
+  const raw = String(dateString ?? "").trim();
+  if (!raw) return null;
+
+  const direct = new Date(raw);
+  if (!Number.isNaN(direct.getTime())) return direct;
+
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const localDate = new Date(normalized);
+  if (!Number.isNaN(localDate.getTime())) return localDate;
+
+  const utcDate = new Date(`${normalized}Z`);
+  if (!Number.isNaN(utcDate.getTime())) return utcDate;
+
+  return null;
+}
+
 // Convert notification time into a simple relative label
-function formatTimeAgo(dateString: string) {
+function formatTimeAgo(dateString: string, t: any) {
   const now = new Date();
-  const created = new Date(dateString);
-  const diffMs = now.getTime() - created.getTime();
+  const created = parseNotificationDate(dateString);
+
+  if (!created) return t("just_now");
+
+  const diffMs = Math.max(0, now.getTime() - created.getTime());
 
   const minutes = Math.floor(diffMs / (1000 * 60));
   const hours = Math.floor(diffMs / (1000 * 60 * 60));
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  if (hours < 24) return `${hours} hr ago`;
-  return `${days} day(s) ago`;
+  if (minutes < 1) return t("just_now");
+  if (minutes < 60) return t("minutes_ago", { count: minutes, defaultValue: `${minutes} min ago` });
+  if (hours < 24) return t("hours_ago", { count: hours, defaultValue: `${hours} hr ago` });
+  return t("days_ago", { count: days, defaultValue: `${days} day(s) ago` });
+}
+
+function localizeNotificationTitle(type: AlertItem["type"], title: string, t: any) {
+  const normalized = String(title ?? "").trim().toLowerCase();
+
+  if (type === "BOOKING" && normalized === "new booking request") {
+    return t("notif_new_booking_title", "New booking request");
+  }
+
+  if (type === "BOOKING" && normalized === "booking cancelled") {
+    return t("notif_booking_cancelled_title", "Booking cancelled");
+  }
+
+  if (type === "BOOKING" && normalized === "booking completed") {
+    return t("notif_booking_completed_title", "Booking completed");
+  }
+
+  if (type === "VERIFICATION" && normalized === "new caregiver verification request") {
+    return t("notif_verification_request_title", "New caregiver verification request");
+  }
+
+  if (type === "VERIFICATION" && normalized === "verification approved") {
+    return t("notif_verification_approved_title", "Verification approved");
+  }
+
+  if (type === "VERIFICATION" && normalized === "verification rejected") {
+    return t("notif_verification_rejected_title", "Verification rejected");
+  }
+
+  if (type === "PAYMENT" && normalized === "payment received") {
+    return t("notif_payment_received_title", "Payment received");
+  }
+
+  return title;
+}
+
+function localizeNotificationBody(type: AlertItem["type"], body: string, t: any) {
+  const normalized = String(body ?? "").trim().toLowerCase();
+
+  if (
+    type === "BOOKING" &&
+    normalized === "you have received a new booking request from a family."
+  ) {
+    return t("notif_new_booking_body", "You have received a new booking request from a family.");
+  }
+
+  if (
+    type === "BOOKING" &&
+    normalized === "a family has cancelled the booking request."
+  ) {
+    return t("notif_booking_cancelled_body", "A family has cancelled the booking request.");
+  }
+
+  if (
+    type === "BOOKING" &&
+    normalized === "the booking has been marked as completed."
+  ) {
+    return t("notif_booking_completed_body", "The booking has been marked as completed.");
+  }
+
+  if (
+    type === "VERIFICATION" &&
+    normalized.includes("has submitted documents for verification")
+  ) {
+    return t("notif_verification_request_body", "A caregiver has submitted documents for verification.");
+  }
+
+  if (
+    type === "VERIFICATION" &&
+    normalized === "your verification was approved."
+  ) {
+    return t("notif_verification_approved_body", "Your verification was approved.");
+  }
+
+  if (
+    type === "VERIFICATION" &&
+    normalized === "your verification was rejected. please re-upload and resubmit."
+  ) {
+    return t("notif_verification_rejected_body", "Your verification was rejected. Please re-upload and resubmit.");
+  }
+
+  if (
+    type === "PAYMENT" &&
+    normalized === "payment has been added to your account."
+  ) {
+    return t("notif_payment_received_body", "Payment has been added to your account.");
+  }
+
+  return body;
 }
 
 export default function CaregiverAlertsScreen({ navigation }: Props) {
@@ -65,11 +174,11 @@ export default function CaregiverAlertsScreen({ navigation }: Props) {
       // Request the latest notifications and map them into UI data
       const response = await getMyNotifications();
       const mapped: AlertItem[] = (response.notifications || []).map((n: any) => ({
-        id: n.notification_id,
+        id: String(n.notification_id ?? ""),
         type: n.type,
-        title: n.title,
-        body: n.message,
-        timeLabel: formatTimeAgo(n.created_at),
+        title: localizeNotificationTitle(n.type, n.title, t),
+        body: localizeNotificationBody(n.type, n.message, t),
+        timeLabel: formatTimeAgo(n.created_at, t),
         unread: !n.is_read,
         relatedEntityType: n.related_entity_type,
         relatedEntityId: n.related_entity_id,
@@ -78,11 +187,11 @@ export default function CaregiverAlertsScreen({ navigation }: Props) {
       setAlerts(mapped);
     } catch (error) {
       console.error("loadNotifications error:", error);
-      Alert.alert("Error", "Failed to load notifications.");
+      Alert.alert(t("error_title", "Error"), t("failed_load_notifications", "Failed to load notifications."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Reload alerts whenever the screen is focused
   useFocusEffect(
@@ -167,7 +276,7 @@ export default function CaregiverAlertsScreen({ navigation }: Props) {
       setAlerts((prev) => prev.map((a) => ({ ...a, unread: false })));
     } catch (error) {
       console.error("handleMarkAllRead error:", error);
-      Alert.alert("Error", "Failed to mark all alerts as read.");
+      Alert.alert(t("error_title", "Error"), t("failed_mark_all_read", "Failed to mark all alerts as read."));
     }
   };
 
@@ -218,7 +327,7 @@ export default function CaregiverAlertsScreen({ navigation }: Props) {
         {loading ? (
           <View style={styles.empty}>
             <Ionicons name="reload-outline" size={26} color={theme.colors.muted} />
-            <Text style={styles.emptyTitle}>Loading alerts...</Text>
+            <Text style={styles.emptyTitle}>{t("loading_alerts", "Loading alerts...")}</Text>
           </View>
         ) : visible.length === 0 ? (
           <View style={styles.empty}>

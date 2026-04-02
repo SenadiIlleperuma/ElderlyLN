@@ -36,10 +36,36 @@ function cleanText(v: any) {
   return s;
 }
 
+function parseServiceDate(value: string) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [y, m, d] = raw.split("-").map(Number);
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+  }
+
+  if (/[zZ]$/.test(raw) || /[+-]\d{2}:\d{2}$/.test(raw)) {
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const utcDate = new Date(`${normalized}Z`);
+  if (!Number.isNaN(utcDate.getTime())) return utcDate;
+
+  const fallback = new Date(raw);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function hasExplicitTime(value: string) {
+  return /T\d{2}:\d{2}/.test(String(value ?? "")) || /\d{2}:\d{2}/.test(String(value ?? ""));
+}
+
 // Format service date into a month and day display
 function formatShiftDate(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return { month: "—", day: "—" };
+  const d = parseServiceDate(iso);
+  if (!d) return { month: "—", day: "—" };
   const month = d.toLocaleString("en-US", { month: "short" }).toUpperCase();
   const day = String(d.getDate());
   return { month, day };
@@ -47,8 +73,9 @@ function formatShiftDate(iso: string) {
 
 // Format service date into a time display
 function formatShiftTime(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  const d = parseServiceDate(iso);
+  if (!d) return "—";
+  if (!hasExplicitTime(iso)) return "—";
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
@@ -161,16 +188,25 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
     const thisMonth = now;
 
     // Split bookings by status for dashboard display
-    const requested = bookings.filter((b) => normStatus(b.booking_status) === "requested");
-    const completed = bookings.filter((b) => normStatus(b.booking_status) === "completed");
-    const accepted = bookings.filter((b) => normStatus(b.booking_status) === "accepted");
+    const requested = bookings.filter((b) => {
+      const status = normStatus(b.booking_status);
+      return status === "requested" || status === "pending";
+    });
+    const completed = bookings.filter((b) => {
+      const status = normStatus(b.booking_status);
+      return status === "completed" || status === "done";
+    });
+    const accepted = bookings.filter((b) => {
+      const status = normStatus(b.booking_status);
+      return status === "accepted" || status === "confirmed" || status === "ongoing";
+    });
 
     
     const totalEarn = completed.reduce((sum, b) => sum + toNumber(b.caregiver_expected_rate), 0);
     
     const monthEarn = completed.reduce((sum, b) => {
-      const d = new Date(b.service_date);
-      if (Number.isNaN(d.getTime())) return sum;
+      const d = parseServiceDate(b.service_date);
+      if (!d) return sum;
       if (!isSameMonth(d, thisMonth)) return sum;
       return sum + toNumber(b.caregiver_expected_rate);
     }, 0);
@@ -178,10 +214,19 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
     // Keep only future accepted bookings and show the next few shifts
     const upcomingAccepted = accepted
       .filter((b) => {
-        const d = new Date(b.service_date);
-        return !Number.isNaN(d.getTime()) && d >= now;
+        const d = parseServiceDate(b.service_date);
+        if (!d) return false;
+
+        const compareDate = new Date(d);
+        compareDate.setHours(23, 59, 59, 999);
+
+        return compareDate >= now;
       })
-      .sort((a, b) => new Date(a.service_date).getTime() - new Date(b.service_date).getTime())
+      .sort((a, b) => {
+        const aTime = parseServiceDate(a.service_date)?.getTime() ?? 0;
+        const bTime = parseServiceDate(b.service_date)?.getTime() ?? 0;
+        return aTime - bTime;
+      })
       .slice(0, 3);
 
     const shifts: Shift[] = upcomingAccepted.map((b) => {
@@ -189,7 +234,7 @@ export default function CaregiverHomeScreen({ navigation }: Props) {
       const district = cleanText(b.family_district);
       const family = cleanText(b.family_name) || t("family_generic");
       const title = district ? `${family} • ${district}` : family;
-      const start = formatShiftTime(b.service_date);
+      const start = cleanText(b.caregiver_time_period) || formatShiftTime(b.service_date);
       return { id: b.booking_id, month, day, title, time: start !== "—" ? start : "—" };
     });
 
