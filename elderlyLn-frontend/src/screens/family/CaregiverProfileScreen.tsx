@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -6,6 +6,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
 import { theme } from "../../constants/theme";
 import { AuthStackParamList } from "../../RootNavigator";
+import { api } from "../../api/api";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "CaregiverProfile">;
 
@@ -146,7 +147,56 @@ function getInitials(name: string) {
 
 export default function CaregiverProfileScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
-  const { caregiver } = route.params;
+  const { caregiver: initialCaregiver } = route.params;
+  const [caregiver, setCaregiver] = useState<any>(initialCaregiver);
+
+  useEffect(() => {
+    const caregiverId =
+      initialCaregiver?.caregiver_id ??
+      initialCaregiver?.caregiverId ??
+      initialCaregiver?.caregiver_fk ??
+      initialCaregiver?.id;
+
+    if (!caregiverId) return;
+
+    let isMounted = true;
+
+    const loadFreshCaregiver = async () => {
+      try {
+        const res = await api.get(`/profile/caregiver/${caregiverId}`);
+
+        if (isMounted && res?.data) {
+          setCaregiver((prev: any) => ({
+            ...prev,
+            ...res.data,
+            review_count:
+              res.data?.review_count ??
+              res.data?.reviews_count ??
+              prev?.review_count ??
+              prev?.reviews_count ??
+              0,
+            reviews_count:
+              res.data?.review_count ??
+              res.data?.reviews_count ??
+              prev?.review_count ??
+              prev?.reviews_count ??
+              0,
+          }));
+        }
+      } catch (error: any) {
+        console.log(
+          "Failed to fetch fresh caregiver profile:",
+          error?.response?.data || error?.message || error
+        );
+      }
+    };
+
+    loadFreshCaregiver();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialCaregiver]);
 
   // Determine display name with fallbacks and generate initials for avatar
   const displayName = displayField(caregiver?.name ?? caregiver?.full_name);
@@ -164,10 +214,11 @@ export default function CaregiverProfileScreen({ navigation, route }: Props) {
   // Read reviews count from available fields
   const reviewsSafe =
     getNumericValue(
+      caregiver?.review_count,
+      caregiver?.reviewCount,
       caregiver?.reviewsCount,
       caregiver?.reviews_count,
-      caregiver?.review_count,
-      caregiver?.reviewCount
+      caregiver?.reviews
     ) ?? 0;
 
   // Read experience years from available fields
