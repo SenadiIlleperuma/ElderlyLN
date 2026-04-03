@@ -1,8 +1,8 @@
-# 🧓 ElderlyLN - AI-Powered Caregiver Management & Matching System
+# ElderlyLN - AI-Powered Caregiver Management & Matching System
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 
 ElderlyLN is an AI-driven caregiver management and matching platform designed to improve **trust, transparency, and accessibility** in elderly care services in Sri Lanka.
 
@@ -16,23 +16,23 @@ The platform is fully trilingual: **Sinhala | Tamil | English**
 
 ---
 
-## 🔎 Key Features
+## Key Features
 
-### 👩‍⚕️ Caregiver Module
+### Caregiver Module
 - Profile creation & editing  
 - Verification document upload (NIC / Police Clearance / Certificates)  
 - Submit profile for verification  
 - Booking request management  
 - Review visibility  
 
-### 👨‍👩‍👧 Family Module
+### Family Module
 - Caregiver search & filtering  
 - AI-based smart matching system  
 - Booking requests  
 - Review & rating system  
 - Complaint submission  
 
-### 👨‍💼 Admin Module
+### Admin Module
 - Dashboard statistics  
 - Verification queue management  
 - Caregiver document review  
@@ -41,21 +41,21 @@ The platform is fully trilingual: **Sinhala | Tamil | English**
 
 ---
 
-## 🧰 Tech Stack
+## Tech Stack
 
-#### 🚀 Backend
+#### Backend
 - Node.js  
 - Express.js  
 - PostgreSQL  
 - JWT Authentication  
 - Multer (File Upload Handling)  
 
-#### 📱 Frontend
+#### Frontend
 - React Native (Expo)  
 - i18n (Sinhala / Tamil / English)  
 - Axios (API Communication)  
 
-#### 🤖 Machine Learning
+#### Machine Learning
 - Python  
 - Random Forest Classifier  
 - Scikit-learn  
@@ -64,37 +64,48 @@ The platform is fully trilingual: **Sinhala | Tamil | English**
 
 ---
 
-### 🧠 How AI Matching Works
+### How AI Matching Works
 
-1️⃣ Family enters care requirements  
-2️⃣ Backend retrieves available caregivers  
-3️⃣ Python ML model calculates suitability score  
-4️⃣ Caregivers are ranked  
-5️⃣ Top matches are returned to the user  
-
----
-
-## ⚙️ Local Setup Guide
+1. Family users enter care requirements  
+2. The backend retrieves available caregivers  
+3. The Python machine learning model calculates a suitability score  
+4. Caregivers are ranked based on predicted suitability  
+5. Top matches are returned to the user  
 
 ---
 
-### 🟢 Backend Setup
+## System Modules
 
-#### 1️⃣ Open Terminal / Command Prompt
+### Family User
+Family users can register, log in, search for caregivers, view caregiver profiles, send booking requests, submit complaints, and provide reviews after completed services.
 
-#### 2️⃣ Navigate to backend folder
+### Caregiver User
+Caregivers can register, maintain their profiles, upload verification documents, submit profiles for verification, manage bookings, and monitor reviews and ratings.
 
-```
+### Administrator
+Administrators can monitor dashboard statistics, review caregiver documents, manage the verification queue, approve or reject caregiver applications, and resolve complaints.
+
+---
+
+## Local Setup Guide
+
+### Backend Setup
+
+#### 1. Open Terminal / Command Prompt
+
+#### 2. Navigate to the backend folder
+
+```bash
 cd backend
 ```
 
-#### 3️⃣ Install dependencies
+#### 3. Install dependencies
 
 ```
 npm install
 ```
 
-#### 4️⃣ Start backend server
+#### 4. Start backend server
 
 ```
 npm start
@@ -109,7 +120,7 @@ Database Connection Connected successfully
 
 ---
 
-### 🤖 Machine Learning Setup (Required Once)
+### Machine Learning Setup (Required Once)
 
 Inside backend folder:
 
@@ -145,23 +156,23 @@ pip install joblib pandas numpy scikit-learn scipy
 
 ---
 
-### 📱 Frontend Setup
+### Frontend Setup
 
 Open a new terminal.
 
-#### 1️⃣ Navigate to frontend folder
+#### 1. Navigate to frontend folder
 
 ```
 cd elderlyLn-frontend
 ```
 
-#### 2️⃣ Install dependencies
+#### 2. Install dependencies
 
 ```
 npm install
 ```
 
-#### 3️⃣ Start Expo
+#### 3. Start Expo
 
 ```
 npx expo start
@@ -174,7 +185,7 @@ You can:
 
 ---
 
-### 🔗 API Configuration
+### API Configuration
 
 For Android Emulator:
 
@@ -190,8 +201,12 @@ http://[YOUR_LOCAL_IP]:5001
 
 ---
 
-### 🎓 Developed As
+### Developed As
 
-Final Year Research Project  
-AI-Powered Caregiver Management & Matching System  
-Built for improving elderly care trust in Sri Lanka 🇱🇰
+Final Year Research Project
+AI-Powered Caregiver Management & Matching System
+Developed to improve trust and accessibility in elderly care services in Sri Lanka
+
+### Academic Note
+
+This project combines mobile application development, backend system design, database integration, multilingual user support, and machine learning-based caregiver recommendation into one unified platform.
