@@ -102,7 +102,6 @@ function translateDisplayValue(value: string, t: (key: string, options?: any) =>
 // Convert backend booking status into simplified UI status
 function toUiStatus(s: BookingRow["booking_status"]): BookingStatusUI {
   if (s === "Completed") return "COMPLETED";
-  if (s === "Requested") return "REQUESTED";
   if (s === "Accepted") return "UPCOMING";
   return "REQUESTED";
 }
@@ -168,7 +167,15 @@ export default function FamilyHomeScreen({ navigation }: Props) {
       // Request the user's bookings from the backend
       const res = await api.get("/booking/myBookings");
       const all: BookingRow[] = Array.isArray(res.data) ? res.data : [];
-      setRecent(all.slice(0, 2));
+
+      const filtered = all.filter(
+        (b) =>
+          b.booking_status === "Requested" ||
+          b.booking_status === "Accepted" ||
+          b.booking_status === "Completed"
+      );
+
+      setRecent(filtered.slice(0, 2));
     } catch (err: any) {
       console.log("Home recent bookings error:", err?.response?.data || err?.message);
       setRecent([]);
