@@ -52,22 +52,26 @@ const score = Number(ratingScore);
     ]);
 
     // Recalculate avg rating for that caregiver and update caregiver table
-    const avgQ = `
+    const statsQ = `
       UPDATE caregiver c
-      SET avg_rating = sub.avg_rating
+      SET
+        avg_rating = sub.avg_rating,
+        review_count = sub.review_count
       FROM (
         SELECT caregiver_fk,
-               COALESCE(ROUND(AVG(rating_score)::numeric, 1), 0.0) AS avg_rating
+               COALESCE(ROUND(AVG(rating_score)::numeric, 1), 0.0) AS avg_rating,
+               COUNT(*)::int AS review_count
         FROM review
         WHERE caregiver_fk = $1
         GROUP BY caregiver_fk
       ) sub
       WHERE c.caregiver_id = sub.caregiver_fk
-      RETURNING c.caregiver_id, c.avg_rating
+      RETURNING c.caregiver_id, c.avg_rating, c.review_count
     `;
-    const avgRes = await client.query(avgQ, [b.caregiver_fk]);
+    const statsRes = await client.query(statsQ, [b.caregiver_fk]);
 
-    const newAvg = avgRes.rows[0]?.avg_rating ?? null;
+    const newAvg = statsRes.rows[0]?.avg_rating ?? null;
+    const newReviewCount = statsRes.rows[0]?.review_count ?? 0;
 
     await client.query("COMMIT");
 
@@ -75,6 +79,7 @@ const score = Number(ratingScore);
       review: iRes.rows[0],
       caregiver_id: b.caregiver_fk,
       new_avg_rating: newAvg,
+      new_review_count: newReviewCount,
     };
   } catch (err) {
     await client.query("ROLLBACK");

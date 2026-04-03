@@ -57,13 +57,38 @@ async function getCaregiverByUserId(userId) {
       c.verification_badges,
       c.profile_status,
       c.profile_image_url,
+      COALESCE(COUNT(r.review_id), 0)::int AS review_count,
       u.email,
       u.phone_no,
       u.is_active,
       u.deactivated_at
     FROM caregiver c
     JOIN "user" u ON u.user_id = c.user_fk
+    LEFT JOIN review r ON r.caregiver_fk = c.caregiver_id
     WHERE c.user_fk = $1
+    GROUP BY
+      c.caregiver_id,
+      c.user_fk,
+      c.full_name,
+      c.age,
+      c.gender,
+      c.district,
+      c.edu_level,
+      c.qualifications,
+      c.experience_years,
+      c.languages_spoken,
+      c.care_category,
+      c.service_type,
+      c.availability_period,
+      c.expected_rate,
+      c.avg_rating,
+      c.verification_badges,
+      c.profile_status,
+      c.profile_image_url,
+      u.email,
+      u.phone_no,
+      u.is_active,
+      u.deactivated_at
     LIMIT 1
   `;
 
@@ -97,9 +122,30 @@ async function getCaregiverPublicProfileById(caregiverId) {
       c.avg_rating,
       c.verification_badges,
       c.profile_status,
-      c.profile_image_url
+      c.profile_image_url,
+      COALESCE(COUNT(r.review_id), 0)::int AS review_count
     FROM caregiver c
+    LEFT JOIN review r ON r.caregiver_fk = c.caregiver_id
     WHERE c.caregiver_id = $1
+    GROUP BY
+      c.caregiver_id,
+      c.user_fk,
+      c.full_name,
+      c.age,
+      c.gender,
+      c.district,
+      c.edu_level,
+      c.qualifications,
+      c.experience_years,
+      c.languages_spoken,
+      c.care_category,
+      c.service_type,
+      c.availability_period,
+      c.expected_rate,
+      c.avg_rating,
+      c.verification_badges,
+      c.profile_status,
+      c.profile_image_url
     LIMIT 1
   `;
 
@@ -109,7 +155,6 @@ async function getCaregiverPublicProfileById(caregiverId) {
   const row = r.rows[0];
   row.profile_status = normalizeStatus(row.profile_status);
   row.verification_badges = row.verification_badges || [];
-  row.reviews_count = 0;
   return row;
 }
 
