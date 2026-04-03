@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {View,Text,StyleSheet,Pressable,ScrollView,Image, ActivityIndicator,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
-
 import { theme } from "../../constants/theme";
 import { AuthStackParamList } from "../../RootNavigator";
 import FamilyBottomNav from "../../components/FamilyBottomNav";
@@ -77,10 +76,10 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   const { matches = [], filters } = route.params || ({} as any);
 
-  // Tracks which caregiver card is currently loading before navigation
   const [openingId, setOpeningId] = useState<string | null>(null);
-  // Stores failed image states to avoid repeatedly rendering broken profile images
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
+  const [displayMatches, setDisplayMatches] = useState<any[]>(matches);
+  const [loadingCards, setLoadingCards] = useState(false);
 
   const district = filters?.district || "anywhere";
   const displayDistrict =
@@ -90,21 +89,97 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
           defaultValue: district.charAt(0).toUpperCase() + district.slice(1),
         });
 
-    // Attempts to fetch the full caregiver profile before opening the profile screen
+  useEffect(() => {
+    setDisplayMatches(matches);
+  }, [matches]);
+
+  useEffect(() => {
+    const enrichMatches = async () => {
+      if (!Array.isArray(matches) || matches.length === 0) {
+        setDisplayMatches([]);
+        return;
+      }
+
+      try {
+        setLoadingCards(true);
+
+        const enriched = await Promise.all(
+          matches.map(async (c: any) => {
+            try {
+              const caregiverId = String(
+                c?.caregiver_id ?? c?.caregiverId ?? c?.id ?? ""
+              ).trim();
+
+              if (!caregiverId) return c;
+
+              const res = await api.get(`/profile/caregiver/${caregiverId}`);
+
+              const fallbackRating = getNumericValue(
+                c?.rating,
+                c?.avg_rating,
+                c?.average_rating,
+                c?.avgRating
+              );
+
+              const fetchedRating = getNumericValue(
+                res?.data?.rating,
+                res?.data?.avg_rating,
+                res?.data?.average_rating,
+                res?.data?.avgRating
+              );
+
+              const fallbackReviews = getNumericValue(
+                c?.review_count,
+                c?.reviewCount,
+                c?.reviewsCount,
+                c?.reviews_count,
+                c?.reviews
+              );
+
+              const fetchedReviews = getNumericValue(
+                res?.data?.review_count,
+                res?.data?.reviewCount,
+                res?.data?.reviewsCount,
+                res?.data?.reviews_count,
+                res?.data?.reviews
+              );
+
+              return {
+                ...c,
+                ...res.data,
+                avg_rating: fetchedRating ?? fallbackRating ?? 0,
+                review_count: fetchedReviews ?? fallbackReviews ?? 0,
+                reviews_count: fetchedReviews ?? fallbackReviews ?? 0,
+              };
+            } catch (error) {
+              console.log("enrich match error:", error);
+              return c;
+            }
+          })
+        );
+
+        setDisplayMatches(enriched);
+      } finally {
+        setLoadingCards(false);
+      }
+    };
+
+    enrichMatches();
+  }, [matches]);
+
   const openCaregiverProfile = async (c: any) => {
     try {
       const caregiverId = String(
         c?.caregiver_id ?? c?.caregiverId ?? c?.id ?? ""
       ).trim();
 
-      // If no valid caregiver ID is found, navigate with the existing data 
       if (!caregiverId) {
         navigation.navigate("CaregiverProfile", { caregiver: c, filters });
         return;
       }
+
       setOpeningId(caregiverId);
 
-      // Requests the full caregiver profile for detailed viewing
       const res = await api.get(`/profile/caregiver/${caregiverId}`);
 
       const fallbackRating = getNumericValue(
@@ -121,22 +196,25 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
       );
 
       const fallbackReviews = getNumericValue(
+        c?.review_count,
+        c?.reviewCount,
         c?.reviewsCount,
         c?.reviews_count,
-        c?.review_count,
-        c?.reviewCount
+        c?.reviews
       );
       const fetchedReviews = getNumericValue(
+        res?.data?.review_count,
+        res?.data?.reviewCount,
         res?.data?.reviewsCount,
         res?.data?.reviews_count,
-        res?.data?.review_count,
-        res?.data?.reviewCount
+        res?.data?.reviews
       );
 
       const mergedCaregiver = {
         ...c,
         ...res.data,
         avg_rating: fetchedRating ?? fallbackRating ?? 0,
+        review_count: fetchedReviews ?? fallbackReviews ?? 0,
         reviews_count: fetchedReviews ?? fallbackReviews ?? 0,
       };
 
@@ -179,8 +257,12 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
             <Text style={styles.edit}>{t("edit")}</Text>
           </Pressable>
         </View>
-        {/* Displays an empty state if no caregivers matched the selected filters */}
-        {matches.length === 0 ? (
+
+        {loadingCards ? (
+          <View style={{ paddingVertical: 20, alignItems: "center" }}>
+            <ActivityIndicator />
+          </View>
+        ) : displayMatches.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="search-outline" size={64} color={theme.colors.muted} />
             <Text style={styles.emptyTitle}>{t("no_matches")}</Text>
@@ -190,8 +272,7 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
             </Pressable>
           </View>
         ) : (
-          matches.map((c: any) => {
-            // Normalise rating values from possible backend field names
+          displayMatches.map((c: any) => {
             const ratingSafe =
               getNumericValue(
                 c?.rating,
@@ -199,13 +280,14 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
                 c?.average_rating,
                 c?.avgRating
               ) ?? 0;
-            // Normalise review count values from possible backend field names  
+
             const reviewsSafe =
               getNumericValue(
+                c?.review_count,
+                c?.reviewCount,
                 c?.reviewsCount,
                 c?.reviews_count,
-                c?.review_count,
-                c?.reviewCount
+                c?.reviews
               ) ?? 0;
 
             const expSafe =
@@ -218,14 +300,14 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
                 : typeof c.experience_years === "string"
                 ? Number(c.experience_years) || 0
                 : 0;
-            // Extracts caregiver specialities for summary text and tag rendering
+
             const specialtiesArr: string[] = Array.isArray(c.specialties)
               ? c.specialties
               : Array.isArray(c.care_category)
               ? c.care_category
               : [];
+
             const translatedSpecialties = translateDisplayList(specialtiesArr, t);
-            // Use the first specialty
             const firstLine = translatedSpecialties?.[0] || t("caregiver_generic");
             const displayName = c?.name ?? c?.full_name ?? t("caregiver_generic");
             const initials = getInitials(displayName);
@@ -236,7 +318,7 @@ export default function TopMatchesScreen({ navigation, route }: Props) {
               c?.image_url ??
               c?.imageUrl ??
               "";
-            // A stable key and loading reference for each caregiver card is made 
+
             const caregiverId = String(
               c?.caregiver_id ?? c?.caregiverId ?? c?.id ?? displayName
             );
