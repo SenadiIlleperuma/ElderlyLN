@@ -33,10 +33,10 @@ const LANG_MAP: Record<string, string> = {
 
 // Predefined working slot options
 const WORK_SLOT_OPTIONS = [
-  "Half-day- අර්ධ දවසේ සේවය",
-  "Full-day - සම්පූර්ණ දවසේ සේවය",
-  "Hourly basis- පැය මත පදනම්ව සේවය",
-  "Live-in Caregiver- පදිංචිව සිටින රැකබලා ගන්නා",
+  "Half-day",
+  "Full-day",
+  "Hourly basis",
+  "Live-in Caregiver",
   "Other",
 ];
 
