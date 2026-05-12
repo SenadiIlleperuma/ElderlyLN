@@ -700,34 +700,33 @@ export default function CaregiverEditProfileScreen({ navigation }: Props) {
         </View>
 
         <Text style={styles.sectionTitle}>
-          {t("time_period_label")}
-        </Text>
-        <View style={styles.chipsWrap}>
-          {WORK_SLOT_OPTIONS.map((slot) => {
-            // Determine if the current slot is selected
-            const active = workSlot === slot;
-            const label =
-              slot === "Half-day- අර්ධ දවසේ සේවය"
-                ? t("half_day")
-                : slot === "Full-day - සම්පූර්ණ දවසේ සේවය"
-                ? t("full_day")
-                : slot === "Hourly basis- පැය මත පදනම්ව සේවය"
-                ? t("hourly")
-                : slot === "Live-in Caregiver- පදිංචිව සිටින රැකබලා ගන්නා"
-                ? t("live_in")
-                : t("other");
+  {t("time_period_label")}
+</Text>
+<View style={styles.chipsWrap}>
+  {WORK_SLOT_OPTIONS.map((slot) => {
+    // Determine if the current slot is selected
+    const active = workSlot === slot;
+    const label =
+      slot === "Half-day"
+        ? t("half_day")
+        : slot === "Full-day"
+        ? t("full_day")
+        : slot === "Hourly basis"
+        ? t("hourly")
+        : slot === "Live-in Caregiver"
+        ? t("live_in")
+        : t("other");
 
-            
-            return (
-              <Pressable
-                key={slot}
-                onPress={() => editMode && setWorkSlot(slot)}
-                style={[styles.chip, active && styles.chipActive, !editMode && { opacity: 0.7 }]}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-              </Pressable>
-            );
-          })}
+    return (
+      <Pressable
+        key={slot}
+        onPress={() => editMode && setWorkSlot(slot)}
+        style={[styles.chip, active && styles.chipActive, !editMode && { opacity: 0.7 }]}
+      >
+        <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      </Pressable>
+    );
+  })}
         </View>
 
         {workSlot === "Other" && (
